@@ -15,6 +15,12 @@
 1. [Visión General](#1-visión-general)
 2. [Arquitectura de Negocio](#2-arquitectura-de-negocio)
 3. [Arquitectura Técnica](#3-arquitectura-técnica)
+   - 3.1 [Vista de Componentes (Capas)](#31-vista-de-componentes)
+   - 3.2 [Diseño Detallado de Componentes](#32-diseño-detallado-de-componentes)
+   - 3.3 [Modelo Entidad-Relación de Base de Datos](#33-modelo-entidad-relación-de-base-de-datos)
+   - 3.4 [Flujo de Datos](#34-flujo-de-datos)
+   - 3.5 [Diagrama de Despliegue](#35-diagrama-de-despliegue)
+   - 3.6 [Arquitectura de Seguridad](#36-arquitectura-de-seguridad)
 4. [Stack Tecnológico](#4-stack-tecnológico)
 5. [Herramientas de Construcción](#5-herramientas-de-construcción)
 6. [Ciclo de Vida de Software](#6-ciclo-de-vida-de-software)
@@ -281,7 +287,1107 @@ DevOps/SRE                             Ejecutivos
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Flujo de Datos
+### 3.2 Diseño Detallado de Componentes
+
+#### 3.2.1 Diagrama de Componentes de Alto Nivel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         SISTEMA msseguridad - COMPONENTES                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              CAPA DE PRESENTACIÓN                               │
+│                                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐│
+│  │ AuthController  │  │ UserController  │  │ OAuthController │  │ AdminCtrl   ││
+│  │                 │  │                 │  │                 │  │             ││
+│  │ - POST /login   │  │ - GET /me       │  │ - /authorize    │  │ - CRUD      ││
+│  │ - POST /logout  │  │ - PATCH /me     │  │ - /token        │  │   users     ││
+│  │ - POST /refresh │  │ - GET /sessions │  │ - /introspect   │  │ - CRUD      ││
+│  │ - POST /mfa/enable│ │ - DELETE /sessions│ │ - /.well-known │  │   roles     ││
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  └──────┬──────┘│
+│           │                    │                    │                   │      │
+│           └────────────────────┴────────────────────┘                   │      │
+│                              │                                          │      │
+└──────────────────────────────┼──────────────────────────────────────────┼──────┘
+                               │                                          │
+                               ▼                                          │
+┌─────────────────────────────────────────────────────────────────────────┼──────┐
+│                              CAPA DE APLICACIÓN                         │      │
+│                                                                         │      │
+│  ┌───────────────────────────────────────────────────────────────────┐  │      │
+│  │                    APPLICATION SERVICES (Use Cases)               │  │      │
+│  │                                                                  │  │      │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────┐ │  │      │
+│  │  │AuthService   │ │UserService   │ │OAuthService  │ │Token   │ │  │      │
+│  │  │              │ │              │ │              │ │Service │ │  │      │
+│  │  │• login()     │ │• create()    │ │• authorize() │ │• create│ │  │      │
+│  │  │• logout()    │ │• update()    │ │• token()     │ │• rotate│ │  │      │
+│  │  │• verifyMfa() │ │• delete()    │ │• introspect()│ │• revoke│ │  │      │
+│  │  │• register()  │ │• findById()  │ │• revoke()    │ │• verify│ │  │      │
+│  │  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └───┬────┘ │  │      │
+│  │         │                │                │             │      │  │      │
+│  │  ┌──────┴───────┐ ┌──────┴───────┐ ┌──────┴───────┐ ┌──┴────┐ │  │      │
+│  │  │MfaService    │ │AuditService  │ │SessionService│ │PermSvc│ │  │      │
+│  │  │              │ │              │ │              │ │       │ │  │      │
+│  │  │• enable()    │ │• log()       │ │• create()    │ │• check│ │  │      │
+│  │  │• verify()    │ │• query()     │ │• terminate() │ │• grant│ │  │      │
+│  │  │• disable()   │ │• export()    │ │• list()      │ │• revoke│ │  │      │
+│  │  │• genBackup() │ │• alert()      │ │• cleanup()   │ │• list │ │  │      │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ └───────┘ │  │      │
+│  │                                                                │  │      │
+│  └────────────────────────────────────────────────────────────────┘  │      │
+│                                                                     │      │
+│  ┌────────────────────────────────────────────────────────────────┐ │      │
+│  │                    DTOs y Validación                            │ │      │
+│  │  • LoginDto, RegisterDto, TokenDto, UpdateUserDto, etc.      │ │      │
+│  │  • Validación con Joi / class-validator                        │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+└─────────────────────────────────────────────────────────────────────┼──────┘
+                               │                                      │
+                               ▼                                      │
+┌─────────────────────────────────────────────────────────────────────┼──────┐
+│                              CAPA DE DOMINIO                        │      │
+│                                                                     │      │
+│  ┌───────────────────────────────────────────────────────────────┐ │      │
+│  │                    ENTIDADES DE NEGOCIO                       │ │      │
+│  │                                                                │ │      │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────┐ │ │      │
+│  │  │ User     │ │ Role     │ │Permission│ │RefreshTok│ │Mfa   │ │ │      │
+│  │  │          │ │          │ │          │ │en        │ │Config│ │ │      │
+│  │  │• id      │ │• id      │ │• id      │ │• id      │ │• id  │ │ │      │
+│  │  │• email   │ │• name    │ │• resource│ │• hash    │ │• type│ │ │      │
+│  │  │• password│ │• slug    │ │• action  │ │• familyId│ │• key │ │ │      │
+│  │  │• status  │ │• level   │ │• slug    │ │• expires │ │• backup│ │      │
+│  │  │• mfaEnab │ │• isDefault│ │• conds   │ │• revoked │ │      │ │      │
+│  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬──┘ │ │      │
+│  │       │            │            │            │           │    │ │      │
+│  │       └────────────┴────────────┴────────────┴───────────┘    │ │      │
+│  │                                                                │ │      │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────┐ │ │      │
+│  │  │ Session  │ │ AuditLog │ │ OAuthClient│ │OAuthCode │ │MfaBkp│ │ │      │
+│  │  │          │ │          │ │            │ │          │ │Code  │ │ │      │
+│  │  │• id      │ │• id      │ │• id        │ │• id      │ │• id  │ │ │      │
+│  │  │• userId  │ │• userId  │ │• name      │ │• code    │ │• hash│ │ │      │
+│  │  │• ip      │ │• action  │ │• secret    │ │• clientId│ │• used│ │ │      │
+│  │  │• ua      │ │• resource│ │• redirect  │ │• userId  │ │• at  │ │ │      │
+│  │  │• active  │ │• ip      │ │• grants    │ │• expires │ │      │ │      │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────┘ │ │      │
+│  │                                                                │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+│                                                                     │      │
+│  ┌────────────────────────────────────────────────────────────────┐ │      │
+│  │                    VALUE OBJECTS                                  │ │      │
+│  │  • Email (validación formato)                                   │ │      │
+│  │  • Password (hash interno)                                      │ │      │
+│  │  • Token (JWT estructurado)                                     │      │
+│  │  • PermissionSlug (formato resource:action)                     │ │      │
+│  │  • GeoLocation (lat, long, city, country)                       │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+│                                                                     │      │
+│  ┌────────────────────────────────────────────────────────────────┐ │      │
+│  │                    DOMAIN SERVICES                              │ │      │
+│  │  • PasswordPolicyService (valida complejidad)                   │ │      │
+│  │  • TokenRotationService (lógica de rotación)                    │ │      │
+│  │  • PermissionEvaluatorService (evalúa ABAC)                   │ │      │
+│  │  • AuditDomainService (reglas de auditoría)                   │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+└─────────────────────────────────────────────────────────────────────┼──────┘
+                               │                                      │
+                               ▼                                      │
+┌─────────────────────────────────────────────────────────────────────┼──────┐
+│                           CAPA DE INFRAESTRUCTURA                  │      │
+│                                                                     │      │
+│  ┌───────────────────────────────────────────────────────────────┐ │      │
+│  │                    REPOSITORIES (Interfaces + Impl)           │ │      │
+│  │                                                                │ │      │
+│  │  IUserRepository ──────▶ TypeOrmUserRepository (MySQL)        │ │      │
+│  │  IRoleRepository ──────▶ TypeOrmRoleRepository (MySQL)        │ │      │
+│  │  ITokenRepository ─────▶ TypeOrmTokenRepository (MySQL)       │ │      │
+│  │  ISessionRepository ───▶ RedisSessionRepository (Redis)       │ │      │
+│  │  ICacheRepository ─────▶ RedisCacheRepository (Redis)           │ │      │
+│  │  IAuditRepository ─────▶ TypeOrmAuditRepository (MySQL)         │ │      │
+│  │                                                                │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+│                                                                     │      │
+│  ┌───────────────────────────────────────────────────────────────┐ │      │
+│  │                    ADAPTERS EXTERNOS                          │ │      │
+│  │                                                                │ │      │
+│  │  ISecurityAdapter ─────▶ Argon2Adapter (hashing)            │ │      │
+│  │  ITokenAdapter ────────▶ JwtAdapter (jsonwebtoken/jose)      │ │      │
+│  │  IMfaAdapter ──────────▶ SpeakeasyAdapter (TOTP)             │ │      │
+│  │  IEmailAdapter ─────────▶ NodemailerAdapter (SMTP)           │ │      │
+│  │  ILoggerAdapter ────────▶ WinstonAdapter (logging)           │ │      │
+│  │  IEventAdapter ─────────▶ RedisEventAdapter (pub/sub)        │ │      │
+│  │                                                                │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+│                                                                     │      │
+│  ┌───────────────────────────────────────────────────────────────┐ │      │
+│  │                    FRAMEWORK & MIDDLEWARE                     │ │      │
+│  │                                                                │ │      │
+│  │  • Express.js (HTTP framework)                                │ │      │
+│  │  • Helmet (security headers)                                    │ │      │
+│  │  • express-rate-limit (throttling)                            │ │      │
+│  │  • cors (CORS handling)                                         │ │      │
+│  │  • compression (gzip)                                           │ │      │
+│  │  • express-validator (input validation)                       │ │      │
+│  │                                                                │ │      │
+│  └────────────────────────────────────────────────────────────────┘ │      │
+└─────────────────────────────────────────────────────────────────────┴──────┘
+```
+
+#### 3.2.2 Diagrama de Dependencias entre Componentes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    DEPENDENCIAS ENTRE COMPONENTES                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  AuthController                                                                 │
+│  ├──▶ AuthService                                                               │
+│  │    ├──▶ IUserRepository (Domain Interface)                                  │
+│  │    │         └──▶ TypeOrmUserRepository (Infra)                              │
+│  │    ├──▶ ITokenService (App Interface)                                        │
+│  │    │         ├──▶ TokenService (App)                                         │
+│  │    │         │      ├──▶ ITokenRepository                                    │
+│  │    │         │      └──▶ JwtAdapter (Infra)                                 │
+│  │    ├──▶ ISecurityAdapter (Domain Interface)                                  │
+│  │    │         └──▶ Argon2Adapter (Infra)                                     │
+│  │    ├──▶ IMfaAdapter (Domain Interface)                                       │
+│  │    │         └──▶ SpeakeasyAdapter (Infra)                                  │
+│  │    └──▶ IAuditService (App Interface)                                        │
+│  │              └──▶ AuditService (App)                                          │
+│  └──▶ RateLimitMiddleware (infra)                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  OAuthController                                                                │
+│  ├──▶ OAuthService                                                              │
+│  │    ├──▶ IOAuthClientRepository                                               │
+│  │    ├──▶ IOAuthCodeRepository                                                  │
+│  │    ├──▶ ITokenService (reutiliza)                                            │
+│  │    └──▶ IUserRepository (reutiliza)                                          │
+│  └──▶ AuthMiddleware (infra)                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  AdminController                                                                │
+│  ├──▶ UserService (con permisos de admin)                                       │
+│  ├──▶ RoleService                                                               │
+│  │    └──▶ IRoleRepository                                                      │
+│  └──▶ PermissionService                                                         │
+│       └──▶ IPermissionRepository                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Cross-Cutting Concerns (todos los controllers)                                 │
+│  ├──▶ ErrorHandlerMiddleware                                                   │
+│  ├──▶ LoggingMiddleware                                                        │
+│  ├──▶ CorrelationIdMiddleware                                                  │
+│  └──▶ SecurityHeadersMiddleware (Helmet)                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.2.3 Interfaces y Contratos
+
+**Repository Interfaces (Domain):**
+```typescript
+// IUserRepository.ts - Capa de Dominio
+interface IUserRepository {
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: Email): Promise<User | null>;
+  findByIds(ids: string[]): Promise<User[]>;
+  findAll(options: QueryOptions): Promise<PaginatedResult<User>>;
+  save(user: User): Promise<User>;
+  update(user: User): Promise<User>;
+  delete(id: string): Promise<void>;
+  exists(email: Email): Promise<boolean>;
+  countActive(): Promise<number>;
+}
+
+// ITokenRepository.ts
+interface ITokenRepository {
+  findByHash(hash: string): Promise<RefreshToken | null>;
+  findByFamilyId(familyId: string): Promise<RefreshToken[]>;
+  findActiveByUser(userId: string): Promise<RefreshToken[]>;
+  save(token: RefreshToken): Promise<RefreshToken>;
+  revoke(id: string, reason: string): Promise<void>;
+  revokeFamily(familyId: string, reason: string): Promise<void>;
+  cleanupExpired(): Promise<number>;
+}
+
+// ISessionRepository.ts
+interface ISessionRepository {
+  findById(id: string): Promise<Session | null>;
+  findActiveByUser(userId: string): Promise<Session[]>;
+  save(session: Session): Promise<Session>;
+  terminate(id: string): Promise<void>;
+  terminateAllByUser(userId: string, exceptId?: string): Promise<void>;
+  cleanupExpired(): Promise<number>;
+}
+```
+
+**Service Interfaces (Application):**
+```typescript
+// IAuthService.ts - Capa de Aplicación
+interface IAuthService {
+  login(credentials: LoginDto): Promise<Result<AuthTokens, AuthError>>;
+  logout(token: string, allDevices?: boolean): Promise<Result<void, AuthError>>;
+  refreshToken(refreshToken: string): Promise<Result<AuthTokens, AuthError>>;
+  register(data: RegisterDto): Promise<Result<User, AuthError>>;
+  verifyMfa(userId: string, code: string): Promise<Result<AuthTokens, AuthError>>;
+  enableMfa(userId: string): Promise<Result<MfaSetup, AuthError>>;
+  confirmMfa(userId: string, code: string, secret: string): Promise<Result<void, AuthError>>;
+  disableMfa(userId: string, password: string): Promise<Result<void, AuthError>>;
+  recoverWithBackupCode(userId: string, code: string): Promise<Result<AuthTokens, AuthError>>;
+}
+
+// ITokenService.ts
+interface ITokenService {
+  generateTokens(user: User, sessionId: string): Promise<AuthTokens>;
+  verifyAccessToken(token: string): Promise<Result<TokenPayload, TokenError>>;
+  rotateRefreshToken(refreshToken: string): Promise<Result<AuthTokens, TokenError>>;
+  revokeToken(token: string, reason: string): Promise<void>;
+  revokeAllUserTokens(userId: string, reason: string): Promise<void>;
+}
+
+// IAuditService.ts
+interface IAuditService {
+  log(event: AuditEvent): Promise<void>;
+  query(filters: AuditFilters): Promise<PaginatedResult<AuditLog>>;
+  export(filters: AuditFilters, format: 'csv' | 'json'): Promise<Buffer>;
+  getSecurityAlerts(startDate: Date, endDate: Date): Promise<SecurityAlert[]>;
+}
+```
+
+**Adapter Interfaces (Infrastructure):**
+```typescript
+// ISecurityAdapter.ts - Capa de Infraestructura
+interface ISecurityAdapter {
+  hashPassword(password: string): Promise<string>;
+  verifyPassword(password: string, hash: string): Promise<boolean>;
+  needsRehash(hash: string): boolean;
+}
+
+// ITokenAdapter.ts
+interface ITokenAdapter {
+  sign(payload: object, options: SignOptions): Promise<string>;
+  verify(token: string, options: VerifyOptions): Promise<TokenPayload>;
+  decode(token: string): TokenPayload | null;
+  generateKeyPair(): Promise<KeyPair>;
+}
+
+// IMfaAdapter.ts
+interface IMfaAdapter {
+  generateSecret(): string;
+  generateQrCodeUrl(secret: string, account: string, issuer: string): string;
+  verifyToken(secret: string, token: string): boolean;
+  generateBackupCodes(): string[];
+  verifyBackupCode(code: string, hashes: string[]): boolean;
+  hashBackupCode(code: string): string;
+}
+```
+
+---
+
+### 3.3 Modelo Entidad-Relación de Base de Datos
+
+#### 3.3.1 Diagrama ER Completo (Crow's Foot Notation)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                         MODELO ENTIDAD-RELACIÓN MySQL 8.0                               │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│     users       │         │     roles       │         │  permissions    │
+├─────────────────┤         ├─────────────────┤         ├─────────────────┤
+│ PK id           │         │ PK id           │         │ PK id           │
+│ email (UQ)      │         │ name (UQ)       │         │ resource        │
+│ password_hash   │         │ slug (UQ)       │         │ action          │
+│ first_name      │         │ description     │         │ slug (UQ)       │
+│ last_name       │         │ hierarchy_level │         │ description     │
+│ status          │         │ is_system       │         │ conditions      │
+│ email_verified  │         │ is_default      │         │ created_at      │
+│ mfa_enabled     │         │ created_at      │         │ updated_at      │
+│ mfa_secret      │         │ updated_at      │         └─────────────────┘
+│ mfa_backup_codes│         └─────────────────┘                  │
+│ locked_until    │                │                             │
+│ failed_attempts │                │                             │
+│ password_changed│                │                             │
+│ last_login      │                ▼                             ▼
+│ created_at      │         ┌─────────────────┐         ┌─────────────────┐
+│ updated_at      │         │  role_permissions│        │  user_roles     │
+└─────────────────┘         ├─────────────────┤         ├─────────────────┤
+         │                  │ PK role_id (FK) │         │ PK user_id (FK) │
+         │                  │ PK perm_id (FK) │         │ PK role_id (FK) │
+         │                  │ granted_at      │         │ assigned_by (FK)│
+         │                  └─────────────────┘         │ assigned_at     │
+         │                                              └─────────────────┘
+         │
+         │ 1:N
+         ▼
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│ refresh_tokens  │         │ user_sessions   │         │   audit_logs    │
+├─────────────────┤         ├─────────────────┤         ├─────────────────┤
+│ PK id           │         │ PK id           │         │ PK id           │
+│ FK user_id      │         │ FK user_id      │         │ FK user_id      │
+│ token_hash (UQ) │         │ session_token   │         │ action          │
+│ family_id       │         │ ip_address      │         │ resource        │
+│ is_revoked      │         │ user_agent      │         │ resource_id     │
+│ revoked_reason  │         │ device_info     │         │ details (JSON)  │
+│ expires_at      │         │ country         │         │ ip_address      │
+│ created_at      │         │ city            │         │ user_agent      │
+│ metadata (JSON) │         │ is_active       │         │ status          │
+└─────────────────┘         │ last_activity   │         │ created_at      │
+         │                  │ expires_at      │         │ session_id      │
+         │                  │ created_at      │         └─────────────────┘
+         │                  └─────────────────┘
+         │
+         │ 1:N
+         ▼
+┌─────────────────┐
+│mfa_backup_codes │
+├─────────────────┤
+│ PK id           │
+│ FK user_id      │
+│ code_hash (UQ)  │
+│ used_at         │
+│ used_ip         │
+│ created_at      │
+└─────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                               OAUTH2 / OIDC TABLES
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+│  oauth_clients  │         │oauth_auth_codes │         │  oauth_tokens   │
+├─────────────────┤         ├─────────────────┤         ├─────────────────┤
+│ PK id           │         │ PK id           │         │ PK id           │
+│ client_id (UQ)  │────────▶│ FK client_id    │         │ FK client_id    │
+│ client_secret   │         │ FK user_id      │         │ FK user_id      │
+│ name            │         │ code (UQ)       │         │ access_token    │
+│ redirect_uris   │         │ redirect_uri    │         │ refresh_token   │
+│ grants          │         │ expires_at      │         │ scopes          │
+│ scopes          │         │ consumed        │         │ expires_at      │
+│ is_confidential │         │ code_challenge  │         │ created_at      │
+│ is_active       │         │ code_challenge_ │         └─────────────────┘
+│ created_at      │         │   method        │
+│ updated_at      │         └─────────────────┘
+└─────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                               PASSWORD HISTORY (Security)
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐
+│ password_history│
+├─────────────────┤
+│ PK id           │
+│ FK user_id      │
+│ password_hash   │
+│ changed_at      │
+│ changed_by      │
+│ reason          │
+└─────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                               SECURITY EVENTS (Real-time)
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────┐
+│ security_events │
+├─────────────────┤
+│ PK id           │
+│ event_type      │
+│ severity        │
+│ user_id         │
+│ ip_address      │
+│ user_agent      │
+│ details (JSON)  │
+│ acknowledged    │
+│ acknowledged_by │
+│ created_at      │
+└─────────────────┘
+```
+
+#### 3.3.2 DDL Completo de la Base de Datos
+
+```sql
+-- ============================================================
+-- 1. TABLA: users (Usuarios del sistema)
+-- ============================================================
+CREATE TABLE users (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    email                   VARCHAR(255) NOT NULL,
+    password_hash           VARCHAR(255) NOT NULL,
+    first_name              VARCHAR(100),
+    last_name               VARCHAR(100),
+    avatar_url              VARCHAR(500),
+    status                  ENUM('active', 'inactive', 'suspended', 'pending') 
+                            DEFAULT 'pending',
+    email_verified_at       TIMESTAMP NULL,
+    mfa_enabled             BOOLEAN DEFAULT FALSE,
+    mfa_secret              VARCHAR(255),
+    mfa_backup_codes_hash   JSON,
+    locked_until            TIMESTAMP NULL,
+    failed_login_attempts   INT UNSIGNED DEFAULT 0,
+    password_changed_at     TIMESTAMP NULL,
+    last_login_at           TIMESTAMP NULL,
+    last_login_ip           VARCHAR(45),
+    preferences             JSON,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_users_email (email),
+    INDEX idx_users_status (status),
+    INDEX idx_users_created (created_at),
+    INDEX idx_users_locked (locked_until),
+    INDEX idx_users_mfa (mfa_enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 2. TABLA: roles (Roles del sistema RBAC)
+-- ============================================================
+CREATE TABLE roles (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    name                    VARCHAR(100) NOT NULL,
+    slug                    VARCHAR(100) NOT NULL,
+    description             TEXT,
+    hierarchy_level         INT UNSIGNED DEFAULT 100,
+    is_system               BOOLEAN DEFAULT FALSE,
+    is_default              BOOLEAN DEFAULT FALSE,
+    metadata                JSON,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_roles_slug (slug),
+    UNIQUE KEY uk_roles_name (name),
+    INDEX idx_roles_hierarchy (hierarchy_level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Roles por defecto
+INSERT INTO roles (id, name, slug, description, hierarchy_level, is_system, is_default) VALUES
+('11111111-1111-1111-1111-111111111111', 'Superadmin', 'superadmin', 'Control total del sistema', 0, TRUE, FALSE),
+('22222222-2222-2222-2222-222222222222', 'Administrator', 'admin', 'Gestión de usuarios y configuración', 50, TRUE, FALSE),
+('33333333-3333-3333-3333-333333333333', 'User', 'user', 'Usuario estándar del sistema', 100, TRUE, TRUE),
+('44444444-4444-4444-4444-444444444444', 'Guest', 'guest', 'Acceso limitado', 200, TRUE, FALSE);
+
+-- ============================================================
+-- 3. TABLA: permissions (Permisos granulares)
+-- ============================================================
+CREATE TABLE permissions (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    resource                VARCHAR(50) NOT NULL,
+    action                  VARCHAR(50) NOT NULL,
+    slug                    VARCHAR(100) NOT NULL,
+    description             TEXT,
+    conditions              JSON,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_permissions_slug (slug),
+    UNIQUE KEY uk_permissions_resource_action (resource, action),
+    INDEX idx_permissions_resource (resource)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Permisos por defecto
+INSERT INTO permissions (slug, resource, action, description) VALUES
+('users:create', 'users', 'create', 'Crear usuarios'),
+('users:read', 'users', 'read', 'Ver cualquier usuario'),
+('users:read:own', 'users', 'read:own', 'Ver perfil propio'),
+('users:update', 'users', 'update', 'Editar cualquier usuario'),
+('users:update:own', 'users', 'update:own', 'Editar perfil propio'),
+('users:delete', 'users', 'delete', 'Eliminar usuarios'),
+('users:block', 'users', 'block', 'Bloquear/desbloquear usuarios'),
+('roles:manage', 'roles', 'manage', 'Gestionar roles y permisos'),
+('audit:read', 'audit', 'read', 'Ver logs de auditoría'),
+('system:configure', 'system', 'configure', 'Configuración del sistema');
+
+-- ============================================================
+-- 4. TABLA: user_roles (Relación N:M usuarios-roles)
+-- ============================================================
+CREATE TABLE user_roles (
+    user_id                 CHAR(36) NOT NULL,
+    role_id                 CHAR(36) NOT NULL,
+    assigned_by             CHAR(36),
+    assigned_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at              TIMESTAMP NULL,
+    is_primary              BOOLEAN DEFAULT FALSE,
+    
+    PRIMARY KEY (user_id, role_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_user_roles_assigned (assigned_at),
+    INDEX idx_user_roles_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 5. TABLA: role_permissions (Relación N:M roles-permisos)
+-- ============================================================
+CREATE TABLE role_permissions (
+    role_id                 CHAR(36) NOT NULL,
+    permission_id           CHAR(36) NOT NULL,
+    granted_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    granted_by              CHAR(36),
+    
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+    FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Asignar permisos a roles
+-- Superadmin: todos los permisos
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT '11111111-1111-1111-1111-111111111111', id FROM permissions;
+
+-- Admin: permisos de gestión
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT '22222222-2222-2222-2222-222222222222', id FROM permissions 
+WHERE slug IN ('users:read', 'users:update', 'users:block', 'audit:read');
+
+-- User: solo permisos propios
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT '33333333-3333-3333-3333-333333333333', id FROM permissions 
+WHERE slug LIKE '%:own';
+
+-- ============================================================
+-- 6. TABLA: refresh_tokens (Tokens de refresco con rotación)
+-- ============================================================
+CREATE TABLE refresh_tokens (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id                 CHAR(36) NOT NULL,
+    token_hash              VARCHAR(255) NOT NULL,
+    family_id               CHAR(36) NOT NULL,
+    session_id              CHAR(36),
+    is_revoked              BOOLEAN DEFAULT FALSE,
+    revoked_at              TIMESTAMP NULL,
+    revoked_reason          VARCHAR(100),
+    expires_at              TIMESTAMP NOT NULL,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metadata                JSON,
+    
+    UNIQUE KEY uk_tokens_hash (token_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_tokens_user (user_id, is_revoked),
+    INDEX idx_tokens_family (family_id),
+    INDEX idx_tokens_expires (expires_at),
+    INDEX idx_tokens_session (session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 7. TABLA: user_sessions (Sesiones activas)
+-- ============================================================
+CREATE TABLE user_sessions (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id                 CHAR(36) NOT NULL,
+    refresh_token_id        CHAR(36),
+    session_token           VARCHAR(255) NOT NULL,
+    ip_address              VARCHAR(45) NOT NULL,
+    user_agent              VARCHAR(500),
+    device_info             JSON,
+    country                 VARCHAR(2),
+    city                    VARCHAR(100),
+    latitude                DECIMAL(10, 8),
+    longitude               DECIMAL(11, 8),
+    is_active               BOOLEAN DEFAULT TRUE,
+    last_activity_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at              TIMESTAMP NOT NULL,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (refresh_token_id) REFERENCES refresh_tokens(id) ON DELETE SET NULL,
+    UNIQUE KEY uk_sessions_token (session_token),
+    INDEX idx_sessions_user (user_id, is_active),
+    INDEX idx_sessions_expires (expires_at),
+    INDEX idx_sessions_ip (ip_address),
+    INDEX idx_sessions_last_activity (last_activity_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 8. TABLA: audit_logs (Auditoría - particionable)
+-- ============================================================
+CREATE TABLE audit_logs (
+    id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id                 CHAR(36),
+    session_id              CHAR(36),
+    action                  VARCHAR(50) NOT NULL,
+    resource                VARCHAR(50) NOT NULL,
+    resource_id             VARCHAR(100),
+    details                 JSON,
+    status                  ENUM('success', 'failure', 'denied') NOT NULL,
+    ip_address              VARCHAR(45) NOT NULL,
+    user_agent              VARCHAR(500),
+    country                 VARCHAR(2),
+    city                    VARCHAR(100),
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_audit_user (user_id, created_at),
+    INDEX idx_audit_action (action, created_at),
+    INDEX idx_audit_resource (resource, resource_id),
+    INDEX idx_audit_time (created_at),
+    INDEX idx_audit_ip (ip_address),
+    INDEX idx_audit_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+PARTITION BY RANGE (UNIX_TIMESTAMP(created_at)) (
+    PARTITION p2024q1 VALUES LESS THAN (UNIX_TIMESTAMP('2024-04-01')),
+    PARTITION p2024q2 VALUES LESS THAN (UNIX_TIMESTAMP('2024-07-01')),
+    PARTITION p2024q3 VALUES LESS THAN (UNIX_TIMESTAMP('2024-10-01')),
+    PARTITION p2024q4 VALUES LESS THAN (UNIX_TIMESTAMP('2025-01-01')),
+    PARTITION pfuture VALUES LESS THAN MAXVALUE
+);
+
+-- ============================================================
+-- 9. TABLA: mfa_backup_codes (Códigos de respaldo MFA)
+-- ============================================================
+CREATE TABLE mfa_backup_codes (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id                 CHAR(36) NOT NULL,
+    code_hash               VARCHAR(255) NOT NULL,
+    used_at                 TIMESTAMP NULL,
+    used_ip                 VARCHAR(45),
+    used_session_id         CHAR(36),
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_backup_codes_hash (code_hash),
+    INDEX idx_backup_codes_user (user_id, used_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 10. TABLAS OAUTH2 (Open Authorization)
+-- ============================================================
+
+CREATE TABLE oauth_clients (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    client_id               VARCHAR(100) NOT NULL,
+    client_secret           VARCHAR(255),
+    name                    VARCHAR(200) NOT NULL,
+    description             TEXT,
+    redirect_uris           JSON NOT NULL,
+    allowed_grants          JSON NOT NULL,
+    allowed_scopes          JSON NOT NULL,
+    is_confidential         BOOLEAN DEFAULT TRUE,
+    is_active               BOOLEAN DEFAULT TRUE,
+    created_by              CHAR(36),
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_oauth_clients_client_id (client_id),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_oauth_clients_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE oauth_authorization_codes (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    code                    VARCHAR(255) NOT NULL,
+    client_id               CHAR(36) NOT NULL,
+    user_id                 CHAR(36) NOT NULL,
+    redirect_uri            VARCHAR(500) NOT NULL,
+    scope                   VARCHAR(500),
+    code_challenge          VARCHAR(255),
+    code_challenge_method   ENUM('S256', 'plain'),
+    expires_at              TIMESTAMP NOT NULL,
+    consumed_at             TIMESTAMP NULL,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_auth_codes_code (code),
+    INDEX idx_auth_codes_expires (expires_at),
+    INDEX idx_auth_codes_client (client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE oauth_access_tokens (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    token                   VARCHAR(500) NOT NULL,
+    client_id               CHAR(36) NOT NULL,
+    user_id                 CHAR(36),
+    scope                   VARCHAR(500),
+    expires_at              TIMESTAMP NOT NULL,
+    revoked_at              TIMESTAMP NULL,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_access_tokens_token (token),
+    INDEX idx_access_tokens_expires (expires_at),
+    INDEX idx_access_tokens_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 11. TABLA: password_history (Histórico de contraseñas)
+-- ============================================================
+CREATE TABLE password_history (
+    id                      CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id                 CHAR(36) NOT NULL,
+    password_hash           VARCHAR(255) NOT NULL,
+    changed_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    changed_by              CHAR(36),
+    reason                  VARCHAR(100),
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_password_history_user (user_id, changed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 12. TABLA: security_events (Eventos de seguridad en tiempo real)
+-- ============================================================
+CREATE TABLE security_events (
+    id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    event_type              VARCHAR(50) NOT NULL,
+    severity                ENUM('info', 'warning', 'critical') NOT NULL,
+    user_id                 CHAR(36),
+    ip_address              VARCHAR(45),
+    user_agent              VARCHAR(500),
+    details                 JSON,
+    acknowledged            BOOLEAN DEFAULT FALSE,
+    acknowledged_by         CHAR(36),
+    acknowledged_at           TIMESTAMP NULL,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (acknowledged_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_security_events_time (created_at),
+    INDEX idx_security_events_user (user_id),
+    INDEX idx_security_events_type (event_type),
+    INDEX idx_security_events_severity (severity),
+    INDEX idx_security_events_ack (acknowledged)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- STORED PROCEDURES PARA MANTENIMIENTO
+-- ============================================================
+
+DELIMITER //
+
+-- Procedimiento: Limpiar tokens expirados
+CREATE PROCEDURE cleanup_expired_tokens()
+BEGIN
+    DELETE FROM refresh_tokens 
+    WHERE expires_at < NOW() - INTERVAL 7 DAY;
+    
+    DELETE FROM oauth_authorization_codes 
+    WHERE expires_at < NOW() - INTERVAL 1 DAY;
+    
+    DELETE FROM oauth_access_tokens 
+    WHERE expires_at < NOW() - INTERVAL 1 DAY;
+    
+    DELETE FROM user_sessions 
+    WHERE expires_at < NOW() - INTERVAL 30 DAY;
+END //
+
+-- Procedimiento: Limpiar logs antiguos (mover a archive)
+CREATE PROCEDURE archive_old_audit_logs(IN days_to_keep INT)
+BEGIN
+    SET @cutoff_date = DATE_SUB(NOW(), INTERVAL days_to_keep DAY);
+    
+    -- Insertar en tabla de archivo (debe existir audit_logs_archive)
+    INSERT INTO audit_logs_archive 
+    SELECT * FROM audit_logs 
+    WHERE created_at < @cutoff_date;
+    
+    -- Eliminar de tabla principal
+    DELETE FROM audit_logs 
+    WHERE created_at < @cutoff_date;
+    
+    SELECT ROW_COUNT() AS archived_records;
+END //
+
+-- Procedimiento: Desbloquear cuentas expiradas
+CREATE PROCEDURE unlock_expired_accounts()
+BEGIN
+    UPDATE users 
+    SET locked_until = NULL, 
+        failed_login_attempts = 0,
+        status = 'active'
+    WHERE locked_until IS NOT NULL 
+      AND locked_until < NOW();
+END //
+
+-- Procedimiento: Detectar sesiones sospechosas
+CREATE PROCEDURE detect_suspicious_sessions()
+BEGIN
+    INSERT INTO security_events (event_type, severity, user_id, ip_address, details)
+    SELECT 
+        'multiple_sessions_same_ip',
+        'warning',
+        user_id,
+        ip_address,
+        JSON_OBJECT('session_count', COUNT(*), 'sessions', JSON_ARRAYAGG(id))
+    FROM user_sessions
+    WHERE is_active = TRUE
+      AND created_at > NOW() - INTERVAL 1 HOUR
+    GROUP BY user_id, ip_address
+    HAVING COUNT(*) > 5;
+END //
+
+DELIMITER ;
+
+-- ============================================================
+-- VISTAS PARA REPORTES
+-- ============================================================
+
+-- Vista: Usuarios con roles
+CREATE VIEW v_users_with_roles AS
+SELECT 
+    u.id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.status,
+    u.mfa_enabled,
+    u.created_at,
+    GROUP_CONCAT(r.name ORDER BY r.hierarchy_level) AS roles,
+    GROUP_CONCAT(r.slug ORDER BY r.hierarchy_level) AS role_slugs
+FROM users u
+LEFT JOIN user_roles ur ON u.id = ur.user_id
+LEFT JOIN roles r ON ur.role_id = r.id
+GROUP BY u.id;
+
+-- Vista: Permisos efectivos por usuario
+CREATE VIEW v_user_permissions AS
+SELECT 
+    u.id AS user_id,
+    u.email,
+    p.resource,
+    p.action,
+    p.slug AS permission
+FROM users u
+JOIN user_roles ur ON u.id = ur.user_id
+JOIN role_permissions rp ON ur.role_id = rp.role_id
+JOIN permissions p ON rp.permission_id = p.id
+WHERE u.status = 'active'
+GROUP BY u.id, p.id;
+
+-- Vista: Sesiones activas con info de usuario
+CREATE VIEW v_active_sessions AS
+SELECT 
+    s.id AS session_id,
+    s.user_id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    s.ip_address,
+    s.country,
+    s.city,
+    s.device_info,
+    s.last_activity_at,
+    s.expires_at,
+    TIMESTAMPDIFF(MINUTE, s.last_activity_at, NOW()) AS minutes_inactive
+FROM user_sessions s
+JOIN users u ON s.user_id = u.id
+WHERE s.is_active = TRUE
+  AND s.expires_at > NOW();
+
+-- Vista: Estadísticas de login
+CREATE VIEW v_login_statistics AS
+SELECT 
+    DATE(created_at) AS date,
+    HOUR(created_at) AS hour,
+    action,
+    status,
+    COUNT(*) AS count
+FROM audit_logs
+WHERE action IN ('login', 'login_failed', 'logout')
+  AND created_at > NOW() - INTERVAL 30 DAY
+GROUP BY DATE(created_at), HOUR(created_at), action, status;
+```
+
+#### 3.3.3 Diagrama de Clases TypeORM
+
+```typescript
+// ============================================================
+// ENTIDADES TYPEORM - Dominio
+// ============================================================
+
+@Entity('users')
+class UserEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ unique: true, length: 255 })
+    email: string;
+
+    @Column({ name: 'password_hash', length: 255 })
+    passwordHash: string;
+
+    @Column({ name: 'first_name', length: 100, nullable: true })
+    firstName: string;
+
+    @Column({ name: 'last_name', length: 100, nullable: true })
+    lastName: string;
+
+    @Column({ type: 'enum', enum: UserStatus, default: UserStatus.PENDING })
+    status: UserStatus;
+
+    @Column({ name: 'email_verified_at', type: 'timestamp', nullable: true })
+    emailVerifiedAt: Date;
+
+    @Column({ name: 'mfa_enabled', default: false })
+    mfaEnabled: boolean;
+
+    @Column({ name: 'mfa_secret', length: 255, nullable: true })
+    mfaSecret: string;
+
+    @Column({ name: 'locked_until', type: 'timestamp', nullable: true })
+    lockedUntil: Date;
+
+    @Column({ name: 'failed_login_attempts', default: 0 })
+    failedLoginAttempts: number;
+
+    @OneToMany(() => RefreshTokenEntity, token => token.user)
+    refreshTokens: RefreshTokenEntity[];
+
+    @OneToMany(() => UserSessionEntity, session => session.user)
+    sessions: UserSessionEntity[];
+
+    @ManyToMany(() => RoleEntity)
+    @JoinTable({
+        name: 'user_roles',
+        joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+        inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' }
+    })
+    roles: RoleEntity[];
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at' })
+    updatedAt: Date;
+}
+
+@Entity('roles')
+class RoleEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ length: 100, unique: true })
+    name: string;
+
+    @Column({ length: 100, unique: true })
+    slug: string;
+
+    @Column({ type: 'int', name: 'hierarchy_level', default: 100 })
+    hierarchyLevel: number;
+
+    @Column({ name: 'is_system', default: false })
+    isSystem: boolean;
+
+    @ManyToMany(() => PermissionEntity)
+    @JoinTable({
+        name: 'role_permissions',
+        joinColumn: { name: 'role_id' },
+        inverseJoinColumn: { name: 'permission_id' }
+    })
+    permissions: PermissionEntity[];
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+}
+
+@Entity('permissions')
+class PermissionEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ length: 50 })
+    resource: string;
+
+    @Column({ length: 50 })
+    action: string;
+
+    @Column({ length: 100, unique: true })
+    slug: string;
+
+    @Column({ type: 'json', nullable: true })
+    conditions: any;
+}
+
+@Entity('refresh_tokens')
+class RefreshTokenEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @ManyToOne(() => UserEntity, user => user.refreshTokens)
+    @JoinColumn({ name: 'user_id' })
+    user: UserEntity;
+
+    @Column({ name: 'token_hash', unique: true })
+    tokenHash: string;
+
+    @Column({ name: 'family_id' })
+    familyId: string;
+
+    @Column({ name: 'is_revoked', default: false })
+    isRevoked: boolean;
+
+    @Column({ name: 'expires_at' })
+    expiresAt: Date;
+}
+
+@Entity('user_sessions')
+class UserSessionEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @ManyToOne(() => UserEntity, user => user.sessions)
+    @JoinColumn({ name: 'user_id' })
+    user: UserEntity;
+
+    @Column({ name: 'session_token', unique: true })
+    sessionToken: string;
+
+    @Column({ name: 'ip_address', length: 45 })
+    ipAddress: string;
+
+    @Column({ type: 'json', nullable: true })
+    deviceInfo: any;
+
+    @Column({ default: true })
+    isActive: boolean;
+
+    @Column({ name: 'expires_at' })
+    expiresAt: Date;
+}
+
+@Entity('audit_logs')
+class AuditLogEntity {
+    @PrimaryGeneratedColumn('increment')
+    id: number;
+
+    @Column({ name: 'user_id', nullable: true })
+    userId: string;
+
+    @Column({ length: 50 })
+    action: string;
+
+    @Column({ length: 50 })
+    resource: string;
+
+    @Column({ type: 'json', nullable: true })
+    details: any;
+
+    @Column({ type: 'enum', enum: ['success', 'failure', 'denied'] })
+    status: string;
+
+    @Column({ name: 'ip_address', length: 45 })
+    ipAddress: string;
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+}
+```
+
+---
+
+### 3.4 Flujo de Datos
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -324,7 +1430,7 @@ DevOps/SRE                             Ejecutivos
         │                      │                      │                  │
 ```
 
-### 3.3 Diagrama de Despliegue
+### 3.5 Diagrama de Despliegue
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -383,7 +1489,7 @@ DevOps/SRE                             Ejecutivos
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.4 Arquitectura de Seguridad
+### 3.6 Arquitectura de Seguridad
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
