@@ -21,6 +21,13 @@
    - 3.4 [Flujo de Datos](#34-flujo-de-datos)
    - 3.5 [Diagrama de Despliegue](#35-diagrama-de-despliegue)
    - 3.6 [Arquitectura de Seguridad](#36-arquitectura-de-seguridad)
+   - 3.7 [Diagramas UML](#37-diagramas-uml)
+     - 3.7.1 [Diagrama de Casos de Uso](#371-diagrama-de-casos-de-uso)
+     - 3.7.2 [Diagrama de Clases](#372-diagrama-de-clases)
+     - 3.7.3 [Diagramas de Secuencia](#373-diagramas-de-secuencia)
+     - 3.7.4 [Diagrama de Actividades](#374-diagrama-de-actividades)
+     - 3.7.5 [Diagrama de Estado](#375-diagrama-de-estado)
+     - 3.7.6 [Diagrama de Componentes de Despliegue](#376-diagrama-de-componentes-de-despliegue)
 4. [Stack Tecnológico](#4-stack-tecnológico)
 5. [Herramientas de Construcción](#5-herramientas-de-construcción)
 6. [Ciclo de Vida de Software](#6-ciclo-de-vida-de-software)
@@ -1540,6 +1547,834 @@ class AuditLogEntity {
 │  • Anomaly Detection                                             │
 │  • Alerting & Response                                           │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3.7 Diagramas UML
+
+Esta sección contiene los principales diagramas UML que modelan el sistema completo.
+
+#### 3.7.1 Diagrama de Casos de Uso (Use Case Diagram)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           DIAGRAMA DE CASOS DE USO                                   │
+│                              msseguridad - Sistema                                   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+                           ┌─────────────────┐
+                           │   «actor»       │
+                           │  Usuario Final  │
+                           │   (Persona)     │
+                           └────────┬────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           │                        │                        │
+           ▼                        ▼                        ▼
+    ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+    │«use case»   │         │«use case»   │         │«use case»   │
+    │  Registrar  │         │   Login     │         │   Logout    │
+    │   Cuenta    │         │             │         │             │
+    └─────────────┘         └──────┬──────┘         └─────────────┘
+                                   │
+                     ┌─────────────┼─────────────┐
+                     │             │             │
+                     ▼             ▼             ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐
+              │«use case»│  │«use case»│  │«use case»│
+              │Habilitar │  │ Gestionar│  │ Recuperar│
+              │   MFA    │  │ Perfil   │  │Password │
+              └──────────┘  └──────────┘  └──────────┘
+                                   │
+                     ┌─────────────┼─────────────┐
+                     ▼             ▼             ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐
+              │«use case»│  │«use case»│  │«use case»│
+              │  Ver     │  │ Cerrar   │  │ Cambiar  │
+              │Sesiones  │  │Sesión    │  │Password  │
+              └──────────┘  └──────────┘  └──────────┘
+
+
+                           ┌─────────────────┐
+                           │   «actor»       │
+                           │ Administrador   │
+                           │   (Persona)     │
+                           └────────┬────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        │                           │                           │
+        ▼                           ▼                           ▼
+ ┌─────────────┐           ┌─────────────┐               ┌─────────────┐
+ │«use case»   │           │«use case»   │               │«use case»   │
+ │ Crear User  │           │ Editar User │               │ Bloquear    │
+ │             │           │             │               │   User      │
+ └─────────────┘           └─────────────┘               └─────────────┘
+        │                           │                           │
+        │              ┌─────────────┴─────────────┐               │
+        │              │                             │               │
+        ▼              ▼                             ▼               ▼
+ ┌─────────────┐ ┌─────────────┐              ┌─────────────┐ ┌─────────────┐
+ │«use case»   │ │«use case»   │              │«use case»   │ │«use case»   │
+ │ Asignar     │ │ Revocar     │              │  Crear      │ │  Editar     │
+ │   Roles     │ │   Roles     │              │   Rol       │ │   Rol       │
+ └─────────────┘ └─────────────┘              └─────────────┘ └─────────────┘
+        │                                            │
+        │              ┌─────────────────────────────┼─────────────┐
+        │              │                             │             │
+        ▼              ▼                             ▼             ▼
+ ┌─────────────┐ ┌─────────────┐              ┌─────────────┐ ┌─────────────┐
+ │«use case»   │ │«use case»   │              │«use case»   │ │«use case»   │
+ │ Ver Audit   │ │ Exportar    │              │ Configurar  │ │ Ver         │
+ │   Logs      │ │   Logs      │              │  Permisos   │ │ Alertas     │
+ └─────────────┘ └─────────────┘              └─────────────┘ └─────────────┘
+
+
+                           ┌─────────────────┐
+                           │   «actor»       │
+                           │ Sistema Externo │
+                           │   (Sistema)     │
+                           └────────┬────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           │                        │                        │
+           ▼                        ▼                        ▼
+    ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+    │«use case»   │         │«use case»   │         │«use case»   │
+    │  Solicitar  │         │  Validar    │         │  Refrescar  │
+    │ Autorización│         │   Token     │         │   Token     │
+    │   (OAuth2)  │         │             │         │             │
+    └─────────────┘         └─────────────┘         └─────────────┘
+                                   │
+                                   ▼
+                          ┌─────────────┐
+                          │«include»    │
+                          │ Verificar   │
+                          │  Permisos   │
+                          └─────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════
+                              RELACIONES INCLUDE/EXTEND
+═══════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                     │
+│   ┌───────────────┐         ┌───────────────┐         ┌───────────────┐            │
+│   │    Login      │────────▶│«include»      │         │   Login       │            │
+│   │               │         │ Validar       │         │   + MFA       │            │
+│   └───────────────┘         │ Credenciales  │         │               │            │
+│                             └───────────────┘         └───────────────┘            │
+│                                                           ▲                         │
+│                                                           │«extend»                  │
+│                                                           │(si MFA habilitado)       │
+│                                                         ┌─┴─────────────┐            │
+│                                                         │ Verificar MFA │            │
+│                                                         └───────────────┘            │
+│                                                                                     │
+│   ┌───────────────┐         ┌───────────────┐                                        │
+│   │ Crear User    │────────▶│«include»      │                                        │
+│   │               │         │ Validar Email │                                        │
+│   └───────────────┘         │ Unico         │                                        │
+│                             └───────────────┘                                        │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.7.2 Diagrama de Clases (Class Diagram)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              DIAGRAMA DE CLASES                                      │
+│                              Dominio + Aplicación                                    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                   CAPA DE DOMINIO                                   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────┐      ┌─────────────────────┐      ┌─────────────────────┐
+│   «entity»          │      │   «entity»          │      │   «entity»          │
+│   User              │<>────│   Role              │<>────│   Permission        │
+├─────────────────────┤ 1  * ├─────────────────────┤ *  * ├─────────────────────┤
+│ - id: UUID          │      │ - id: UUID          │      │ - id: UUID          │
+│ - email: Email      │      │ - name: string      │      │ - resource: string  │
+│ - password: Pass    │      │ - slug: string      │      │ - action: string    │
+│ - status: Status    │      │ - hierarchy: int    │      │ - slug: string      │
+│ - mfaEnabled: bool│      │ - isDefault: bool  │      │ - conditions: JSON  │
+│ - mfaSecret: string│     │                     │      │                     │
+│ - lockedUntil: Date │      │ + canAccess()       │      │ + evaluate()        │
+│ - failedAttempts: int│     │ + getPermissions()  │      │                     │
+│                     │      │                     │      │                     │
+│ + login()           │      └─────────────────────┘      └─────────────────────┘
+│ + enableMfa()       │                △
+│ + disableMfa()      │                │
+│ + lock()            │      ┌─────────┴─────────┐
+│ + unlock()          │      │                   │
+│ + changePassword()  │      ▼                   ▼
+│ + verifyPassword()   │┌──────────┐      ┌──────────┐
+│ + hasPermission()   ││Superadmin│      │  Admin   │
+└─────────────────────┘│  Role    │      │  Role    │
+        │ 1            └──────────┘      └──────────┘
+        │
+        │ 1
+        ▼
+┌─────────────────────┐      ┌─────────────────────┐      ┌─────────────────────┐
+│   «value object»    │      │   «value object»    │      │   «value object»    │
+│   Email             │      │   Password          │      │   Token             │
+├─────────────────────┤      ├─────────────────────┤      ├─────────────────────┤
+│ - value: string     │      │ - hash: string      │      │ - accessToken: str  │
+│                     │      │ - algorithm: string │      │ - refreshToken: str │
+│ + validate()        │      │ - salt: string      │      │ - expiresIn: int    │
+│ + normalize()       │      │                     │      │ - type: string      │
+│ + equals()          │      │ + verify()          │      │                     │
+│                     │      │ + needsRehash()     │      │ + isExpired()       │
+└─────────────────────┘      │ + toString(): ***   │      │ + toBearer()        │
+                             └─────────────────────┘      └─────────────────────┘
+
+┌─────────────────────┐      ┌─────────────────────┐      ┌─────────────────────┐
+│   «entity»          │      │   «entity»          │      │   «entity»          │
+│   RefreshToken      │      │   UserSession       │      │   AuditLog          │
+├─────────────────────┤      ├─────────────────────┤      ├─────────────────────┤
+│ - id: UUID          │      │ - id: UUID          │      │ - id: bigint        │
+│ - userId: UUID      │      │ - userId: UUID      │      │ - userId: UUID      │
+│ - tokenHash: string │      │ - sessionToken: str │      │ - action: string    │
+│ - familyId: UUID    │      │ - ipAddress: string │      │ - resource: string│
+│ - isRevoked: bool   │      │ - userAgent: string │      │ - resourceId: string│
+│ - revokedReason: str│      │ - deviceInfo: JSON  │      │ - details: JSON     │
+│ - expiresAt: Date │      │ - country: string   │      │ - ipAddress: string │
+│ - metadata: JSON    │      │ - city: string      │      │ - status: Status    │
+│                     │      │ - isActive: bool    │      │ - createdAt: Date   │
+│ + revoke()          │      │ - lastActivity: Date│      │                     │
+│ + isValid(): bool   │      │ - expiresAt: Date   │      │                     │
+│ + rotate(): Token   │      │                     │      │                     │
+│                     │      │ + terminate()       │      │                     │
+│                     │      │ + touch()           │      │                     │
+└─────────────────────┘      │ + isExpired(): bool │      │                     │
+                             └─────────────────────┘      └─────────────────────┘
+                                    │ 1
+                                    │
+                                    ▼
+                             ┌─────────────────────┐
+                             │   «value object»    │
+                             │   GeoLocation       │
+                             ├─────────────────────┤
+                             │ - latitude: decimal │
+                             │ - longitude: decimal│
+                             │ - country: string   │
+                             │ - city: string      │
+                             └─────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              CAPA DE APLICACIÓN                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────┐
+│ «interface»                   │
+│ IAuthService                  │
+├───────────────────────────────┤
+│ + login(credentials): Result  │
+│ + logout(token): Result       │
+│ + refreshToken(token): Result │
+│ + register(data): Result        │
+│ + verifyMfa(userId, code)     │
+│ + enableMfa(userId)           │
+│ + disableMfa(userId, pass)    │
+└───────────────┬───────────────┘
+                △
+                │ implements
+        ┌───────┴───────┐
+        │               │
+        ▼               ▼
+┌───────────────┐ ┌───────────────┐
+│ AuthService   │ │ AuthController│
+├───────────────┤ ├───────────────┤
+│ - userRepo    │ │ - authService │
+│ - tokenRepo   │ │ - rateLimiter │
+│ - tokenSvc    │ │ - validator   │
+│ - security    │ │               │
+│ - auditSvc    │ │ + login()     │
+│               │ │ + logout()    │
+│ + login()     │ │ + refresh()   │
+│ + logout()    │ │ + register()  │
+│ + refresh()   │ │ + enableMfa() │
+└───────────────┘ └───────────────┘
+
+┌───────────────────────────────┐      ┌───────────────────────────────┐
+│ «interface»                   │      │ «interface»                   │
+│ ITokenService                 │      │ IUserRepository               │
+├───────────────────────────────┤      ├───────────────────────────────┤
+│ + generateTokens(): Tokens    │      │ + findById(): User            │
+│ + verifyAccessToken(): Payload│      │ + findByEmail(): User         │
+│ + rotateRefreshToken(): Tokens│      │ + findAll(): User[]           │
+│ + revokeToken()               │      │ + save(): User                │
+│ + revokeAllUserTokens()       │      │ + update(): User              │
+└───────────────┬───────────────┘      │ + delete()                    │
+                △                      │ + exists(): boolean           │
+                │ implements           └───────────────┬───────────────┘
+        ┌───────┴───────┐                              △
+        │               │                              │ implements
+        ▼               ▼                              │
+┌───────────────┐ ┌───────────────┐          ┌─────────┴─────────┐
+│ TokenService  │ │ JwtAdapter    │          │TypeOrmUserRepository│
+├───────────────┤ ├───────────────┤          ├─────────────────────┤
+│ - tokenRepo   │ │ - privateKey  │          │ - repository        │
+│ - jwtAdapter  │ │ - publicKey   │          │                     │
+│               │ │ - algorithm   │          │ + findById()        │
+│ + generate()  │ │               │          │ + findByEmail()     │
+│ + verify()    │ │ + sign()      │          │ + save()            │
+│ + rotate()    │ │ + verify()    │          │ + update()          │
+└───────────────┘ └───────────────┘          └─────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              CAPA DE INFRAESTRUCTURA                                │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────┐      ┌───────────────────────────────┐      ┌───────────────┐
+│ «interface»                   │      │ «interface»                   │      │ «adapter»     │
+│ ISecurityAdapter              │      │ IEmailAdapter                 │      │ Argon2Adapter │
+├───────────────────────────────┤      ├───────────────────────────────┤      ├───────────────┤
+│ + hashPassword(): string      │      │ + send()                      │      │ - argon2      │
+│ + verifyPassword(): boolean   │      │ + sendTemplate()              │      │               │
+│ + needsRehash(): boolean      │      │ + sendBulk()                  │      │ + hash()      │
+└───────────────┬───────────────┘      └───────────────┬───────────────┘      │ + verify()    │
+                △                                      △                      └───────────────┘
+                │                                      │
+                └──────────────────┬───────────────────┘
+                                   │
+                         ┌─────────┴─────────┐
+                         │                   │
+                         ▼                   ▼
+               ┌───────────────┐   ┌───────────────┐
+               │SecurityService│   │ EmailService  │
+               └───────────────┘   └───────────────┘
+```
+
+#### 3.7.3 Diagramas de Secuencia (Sequence Diagrams)
+
+**Diagrama de Secuencia: Login con MFA**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    SECUENCIA: LOGIN CON MFA                                          │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+    Cliente              API              AuthService          UserRepo         MFAService
+      │                   │                    │                 │                 │
+      │ POST /login       │                    │                 │                 │
+      │──────────────────▶│                    │                 │                 │
+      │                   │ validate(cred)     │                 │                 │
+      │                   │──────────────────▶│                │                 │
+      │                   │                    │ findByEmail()   │                 │
+      │                   │                    │────────────────▶│                 │
+      │                   │                    │◀────────────────│                 │
+      │                   │                    │                 │                 │
+      │                   │                    │ verifyPassword()                │
+      │                   │                    │ (Argon2id)      │                 │
+      │                   │                    │────────┐        │                 │
+      │                   │                    │◀───────┘        │                 │
+      │                   │                    │                 │                 │
+      │                   │                    │ checkMfaEnabled │                 │
+      │                   │                    │────────┐        │                 │
+      │                   │                    │◀───────┘        │                 │
+      │                   │                    │                 │                 │
+      │     [MFA enabled] │                    │                 │                 │
+      │◀──────────────────│ return MFA_REQUIRED│                 │                 │
+      │                   │                    │                 │                 │
+      │ POST /mfa/verify  │                    │                 │                 │
+      │──────────────────▶│ verifyMfa()        │                 │                 │
+      │                   │──────────────────▶│                 │                 │
+      │                   │                    │                 │                 │──┐
+      │                   │                    │                 │                 │  │ verifyTOTP
+      │                   │                    │                 │                 │◀─┘
+      │                   │                    │◀─────────────────────────────────│
+      │                   │                    │                 │                 │
+      │                   │                    │ generateTokens()                  │
+      │                   │                    │────────┐        │                 │
+      │                   │                    │        │ sign JWT              │
+      │                   │                    │◀───────┘        │                 │
+      │                   │                    │                 │                 │
+      │                   │                    │ saveRefreshToken                │
+      │                   │                    │────────────────▶│                 │
+      │                   │                    │◀────────────────│                 │
+      │                   │                    │                 │                 │
+      │                   │    return Tokens   │                 │                 │
+      │◀──────────────────│◀───────────────────│                 │                 │
+      │                   │                    │                 │                 │
+      ├───────────────────┴────────────────────┴─────────────────┴─────────────────┤
+      │                              ASYNC (no bloqueante)                          │
+      │                   │                    │                 │                 │
+      │                   │                    │ logEvent()      │                 │
+      │                   │                    │───────────────────────────────────▶│
+      │                   │                    │                 │                 │
+      │                   │                    │ sendEmail()     │                 │
+      │                   │                    │──────────────────────────────▶  │
+      │                   │                    │                 │                 │
+```
+
+**Diagrama de Secuencia: Rotación de Refresh Token (Family Pattern)**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    SECUENCIA: ROTACIÓN DE REFRESH TOKEN                               │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+    Cliente              API            TokenService        TokenRepo        JwtAdapter
+      │                   │                  │                 │               │
+      │ POST /refresh     │                  │                 │               │
+      │ {refreshToken}    │                  │                 │               │
+      │──────────────────▶│                 │                 │               │
+      │                   │ rotate(token)    │                 │               │
+      │                   │─────────────────▶│                │               │
+      │                   │                  │                 │               │
+      │                   │                  │ findByHash()    │               │
+      │                   │                  │────────────────▶│               │
+      │                   │                  │◀────────────────│               │
+      │                   │                  │                 │               │
+      │                   │                  │ [Token no existe]              │
+      │                   │                  │ ──▶ return Error               │
+      │                   │                  │                 │               │
+      │                   │                  │ [Token revocado]               │
+      │                   │                  │ ──▶ revokeFamily() ────────────▶│
+      │                   │                  │ return Error (suspicious)      │
+      │                   │                  │                 │               │
+      │                   │                  │ [Token válido]                 │
+      │                   │                  │                 │               │
+      │                   │                  │ verifyExpiry()  │               │
+      │                   │                  │────────┐        │               │
+      │                   │                  │◀───────┘        │               │
+      │                   │                  │                 │               │
+      │                   │                  │ generateNewPair │               │
+      │                   │                  │────────┐        │               │
+      │                   │                  │        │ sign()  │               │
+      │                   │                  │        │────────▶│               │
+      │                   │                  │        │◀────────│               │
+      │                   │                  │◀───────┘        │               │
+      │                   │                  │                 │               │
+      │                   │                  │ save(newToken)  │               │
+      │                   │                  │ markOldReplaced │               │
+      │                   │                  │────────────────▶│               │
+      │                   │                  │◀────────────────│               │
+      │                   │                  │                 │               │
+      │                   │    return Tokens │                 │               │
+      │◀──────────────────│◀─────────────────│                 │               │
+      │                   │                  │                 │               │
+```
+
+**Diagrama de Secuencia: OAuth2 Authorization Code Flow con PKCE**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    SECUENCIA: OAUTH2 AUTHORIZATION CODE + PKCE                        │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+  UserAgent    ClientApp     AuthServer      UserRepo      OAuthRepo      JwtAdapter
+      │            │             │             │             │             │
+      │            │ 1. /authorize?           │             │             │
+      │            │    client_id&            │             │             │
+      │            │    code_challenge        │             │             │
+      │            │────────────────────────▶│             │             │
+      │            │             │             │             │             │
+      │ redirect   │             │ 2. validate client      │             │
+      │ to login   │             │────────────────────────▶│             │
+      │◀───────────│             │             │             │             │
+      │            │             │◀────────────│             │             │
+      │            │             │             │             │             │
+      │ 3. login   │             │             │             │             │
+      │────────────────────────▶│             │             │             │
+      │            │             │ authenticate│             │             │
+      │            │             │────────────▶│             │             │
+      │            │             │◀────────────│             │             │
+      │            │             │             │             │             │
+      │ consent    │             │ 4. check grants           │             │
+      │ screen     │             │             │             │             │
+      │◀───────────│             │             │             │             │
+      │            │             │             │             │             │
+      │ approve    │             │             │             │             │
+      │────────────────────────▶│             │             │             │
+      │            │             │             │             │             │
+      │            │             │ 5. generate code          │             │
+      │            │             │──────────────────────────▶│             │
+      │            │             │             │             │             │
+      │ redirect   │             │             │             │             │
+      │ to         │             │             │             │             │
+      │ redirect_uri│            │             │             │             │
+      │?code=xxx   │             │             │             │             │
+      │───────────▶│             │             │             │             │
+      │            │             │             │             │             │
+      │            │ 6. POST /token           │             │             │
+      │            │    code&                  │             │             │
+      │            │    code_verifier          │             │             │
+      │            │────────────────────────▶│             │             │
+      │            │             │             │             │             │
+      │            │             │ 7. verify PKCE            │             │
+      │            │             │    S256(code_verifier)    │             │
+      │            │             │    == code_challenge    │             │
+      │            │             │────────────┐            │             │
+      │            │             │◀───────────┘            │             │
+      │            │             │             │             │             │
+      │            │             │ 8. consume code           │             │
+      │            │             │──────────────────────────▶│             │
+      │            │             │             │             │             │
+      │            │             │ 9. generate tokens        │             │
+      │            │             │───────────────────────────────────────▶│
+      │            │             │             │             │             │
+      │            │             │◀───────────────────────────────────────│
+      │            │             │             │             │             │
+      │            │    10. return {access, refresh}       │             │
+      │            │◀────────────────────────│             │             │
+      │            │             │             │             │             │
+```
+
+#### 3.7.4 Diagrama de Actividades (Activity Diagram)
+
+**Proceso de Autenticación Completo**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    ACTIVITY: PROCESO DE AUTENTICACIÓN                                 │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+                        ┌─────────┐
+                        │  START  │
+                        └────┬────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+         ┌─────────│  Recibir Request  │
+         │         │   POST /login     │
+         │         └────────┬────────┘
+         │                  │
+         │                  ▼
+         │         ┌─────────────────┐
+         │         │ Validar Schema  │
+         │         │   (Joi/Zod)     │
+         │         └────────┬────────┘
+         │                  │
+         │      ┌───────────┴───────────┐
+         │      │                       │
+         │   [Inválido]             [Válido]
+         │      │                       │
+         │      ▼                       ▼
+         │ ┌─────────┐         ┌─────────────────┐
+         │ │ return  │         │  Buscar User    │
+         │ │ 400     │         │  por Email      │
+         │ └────┬────┘         └────────┬────────┘
+         │      │                        │
+         │      │              ┌─────────┴─────────┐
+         │      │              │                   │
+         │      │          [No existe]        [Existe]
+         │      │              │                   │
+         │      │              ▼                   ▼
+         │      │      ┌─────────────┐    ┌─────────────┐
+         │      │      │ return 401  │    │ Verificar   │
+         │      │      │ credencial  │    │ Password    │
+         │      │      │  inválida   │    │  Argon2id   │
+         │      │      └─────────────┘    └──────┬──────┘
+         │      │                                 │
+         │      │                    ┌────────────┴────────────┐
+         │      │                    │                         │
+         │      │                [Inválida]              [Válida]
+         │      │                    │                         │
+         │      │                    ▼                         ▼
+         │      │          ┌─────────────┐            ┌─────────────┐
+         │      │          │ Incrementar │            │ Resetear    │
+         │      │          │   intentos  │            │  intentos   │
+         │      │          └──────┬──────┘            └──────┬──────┘
+         │      │                 │                          │
+         │      │                 ▼                          ▼
+         │      │      ┌─────────────────┐         ┌─────────────────┐
+         │      │      │  Intentos >= 5? │         │ Verificar MFA   │
+         │      │      └────────┬────────┘         │  habilitado?    │
+         │      │               │                  └────────┬────────┘
+         │      │        ┌──────┴──────┐                      │
+         │      │        │             │              ┌───────┴────────┐
+         │      │     [No]         [Sí]            [No]           [Sí]
+         │      │        │             │              │                │
+         │      │        ▼             ▼              ▼                ▼
+         │      │  ┌─────────┐  ┌─────────────┐ ┌──────────┐ ┌─────────────┐
+         │      │  │return   │  │ Bloquear    │ │ Generar  │ │ Solicitar   │
+         │      │  │401      │  │ cuenta 15min│ │ tokens   │ │ código MFA  │
+         │      │  │         │  │             │ │          │ │             │
+         │      │  └────┬────┘  └──────┬──────┘ └────┬─────┘ └──────┬──────┘
+         │      │       │              │             │              │
+         │      │       └──────────────┴─────────────┴──────────────┘
+         │      │                              │
+         │      │                              ▼
+         │      │                     ┌─────────────────┐
+         │      │                     │   return 202    │
+         │      │                     │ MFA_REQUIRED    │
+         │      │                     └────────┬────────┘
+         │      │                              │
+         │      └──────────────────────────────┘
+         │                                     │
+         │                        ┌────────────┴────────────┐
+         │                        │                         │
+         │                    [POST /mfa/verify]       [Skip MFA]
+         │                        │                         │
+         │                        ▼                         ▼
+         │               ┌─────────────┐          ┌─────────────┐
+         │               │ Verificar   │          │ Generar     │
+         │               │ código TOTP │          │ Access+Refresh│
+         │               └──────┬──────┘          └──────┬──────┘
+         │                      │                        │
+         │              ┌───────┴───────┐                │
+         │              │               │                │
+         │          [Válido]      [Inválido]             │
+         │              │               │                │
+         │              ▼               ▼                │
+         │      ┌─────────────┐  ┌─────────────┐          │
+         │      │ Generar     │  │ return 401  │          │
+         │      │ tokens      │  │ MFA inválido│          │
+         │      └──────┬──────┘  └─────────────┘          │
+         │             │                                   │
+         │             └───────────────────────────────────┘
+         │                             │
+         │                             ▼
+         │                  ┌─────────────────┐
+         │                  │ Guardar Refresh │
+         │                  │ Token en DB     │
+         │                  └────────┬────────┘
+         │                           │
+         │                           ▼
+         │                  ┌─────────────────┐
+         │         ┌───────│  Auditar Evento │
+         │         │       │   (async)       │
+         │         │       └────────┬────────┘
+         │         │                │
+         │         │                ▼
+         │         │       ┌─────────────────┐
+         │         │       │ return 200 +    │
+         └─────────┼──────▶│ {access, refresh}│
+                   │       └────────┬────────┘
+                   │                │
+                   │                ▼
+                   │       ┌─────────────────┐
+                   │       │     END         │
+                   │       └─────────────────┘
+                   │
+                   └──────────────────────────────────────────────┘
+```
+
+#### 3.7.5 Diagrama de Estado (State Machine)
+
+**Máquina de Estados: Refresh Token Lifecycle**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    STATE MACHINE: REFRESH TOKEN LIFECYCLE                             │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+                         ┌─────────────┐
+                         │   [START]   │
+                         └──────┬──────┘
+                                │ generate()
+                                ▼
+                         ┌─────────────┐
+                         │   ACTIVE    │
+                         │  (fresh)    │
+                         └──────┬──────┘
+                                │
+                ┌───────────────┼───────────────┐
+                │               │               │
+                │ use()         │ expire()      │ revoke()
+                ▼               ▼               ▼
+         ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+         │  USED_ONCE  │ │   EXPIRED   │ │  REVOKED    │
+         │             │ │             │ │             │
+         │ (replaced)  │ │             │ │ (compromised)│
+         └──────┬──────┘ └─────────────┘ └─────────────┘
+                │ use() again
+                │ (reuse detected!)
+                ▼
+         ┌─────────────┐         ┌─────────────┐
+         │ REUSE_DETECT│────────▶│ REVOKE_ALL  │
+         │             │         │ (entire     │
+         │ (suspicious)│         │  family)    │
+         └─────────────┘         └─────────────┘
+                │
+                │ alertSecurityTeam()
+                ▼
+         ┌─────────────┐
+         │ [END STATE] │
+         └─────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════
+                    STATE MACHINE: USER ACCOUNT
+═══════════════════════════════════════════════════════════════════════════════════════
+
+                              ┌─────────────┐
+                              │   [START]   │
+                              └──────┬──────┘
+                                     │ register()
+                                     ▼
+                              ┌─────────────┐
+                              │   PENDING   │
+                              │(email not   │
+                              │  verified)   │
+                              └──────┬──────┘
+                                     │ verifyEmail()
+                                     ▼
+                              ┌─────────────┐
+                         ┌───▶│   ACTIVE    │◀───┐
+                         │    │             │    │
+                         │    └──────┬──────┘    │
+                         │           │           │
+          ┌─────────────┼───────────┼───────────┼─────────────┐
+          │             │           │           │             │
+          │suspend()    │block()    │deactivate()│    activate()│
+          ▼             ▼           ▼           ▼             │
+   ┌─────────────┐┌─────────────┐┌─────────────┐┌─────────────┐│
+   │  SUSPENDED  ││   BLOCKED   ││  INACTIVE   ││   LOCKED    │┘
+   │             ││  (temporal) ││             ││(failed logins)│
+   │             ││             ││             ││             │
+   │             ││  │          ││             ││             │
+   │             ││  │ auto-unlock│             ││             │
+   │             ││  │ after 15min│             ││             │
+   │             ││  ▼          ││             ││             │
+   │             │└─────────────┘│             │└─────────────┘
+   │             │               │             │
+   └─────────────┘               └─────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════
+                    STATE MACHINE: MFA VERIFICATION
+═══════════════════════════════════════════════════════════════════════════════════════
+
+                    ┌─────────────┐
+                    │ [IDLE] /   │
+                    │ MFA_DISABLED│
+                    └──────┬──────┘
+                           │ enableMfa()
+                           ▼
+                    ┌─────────────┐
+                    │ MFA_SETUP   │
+                    │ (secret gen)│
+                    └──────┬──────┘
+                           │ confirmWithCode()
+                           ▼
+                    ┌─────────────┐
+              ┌────▶│ MFA_ENABLED │◀────┐
+              │     │             │     │
+              │     └──────┬──────┘     │
+              │            │            │
+              │    ┌───────┴───────┐    │
+              │    │               │    │
+              │login()           │disableMfa()
+              │    │               │    │
+              │    ▼               ▼    │
+              │┌──────────┐   ┌─────────┐│
+              ││MFA_VERIFY│   │ [IDLE]  ││
+              ││(code req)│   │         │┘
+              │└────┬─────┘   └─────────┘
+              │     │
+              │     │ verifyCode()
+              │     │
+              │   ┌─┴───────────┐
+              └───┤ MFA_SUCCESS │
+                  │ (logged in) │
+                  └─────────────┘
+```
+
+#### 3.7.6 Diagrama de Componentes de Despliegue (Deployment Component Diagram)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    DIAGRAMA DE COMPONENTES DE DESPLIEGUE                                │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              «device» Cloud / VPS                                    │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                      «node» Kubernetes Cluster                                   │ │
+│  │                                                                                  │ │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐ │ │
+│  │  │                    «artifact» Ingress Controller (nginx)                     │ │ │
+│  │  │                      - TLS termination                                        │ │ │
+│  │  │                      - Rate limiting                                        │ │ │
+│  │  │                      - Path routing                                         │ │ │
+│  │  └────────────────────────────┬────────────────────────────────────────────────┘ │ │
+│  │                               │                                                │ │
+│  │                               ▼                                                │ │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐ │ │
+│  │  │                    «node» Service: msseguridad-app                           │ │ │
+│  │  │                                                                               │ │ │
+│  │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐               │ │ │
+│  │  │  │ «component»     │  │ «component»     │  │ «component»     │               │ │ │
+│  │  │  │   API REST      │  │   WebSocket     │  │   Health        │               │ │ │
+│  │  │  │   (Express)     │  │   (Socket.io)   │  │   (/health)     │               │ │ │
+│  │  │  │                 │  │                 │  │                 │               │ │ │
+│  │  │  │ - Auth routes   │  │ - Session mgmt  │  │ - Liveness      │               │ │ │
+│  │  │  │ - OAuth routes  │  │ - Real-time     │  │ - Readiness     │               │ │ │
+│  │  │  │ - Admin routes  │  │   notif         │  │ - Metrics       │               │ │ │
+│  │  │  └────────┬────────┘  └─────────────────┘  └─────────────────┘               │ │ │
+│  │  │           │                                                                  │ │ │
+│  │  │           ▼                                                                  │ │ │
+│  │  │  ┌─────────────────────────────────────────────────────────────────────────┐ │ │ │
+│  │  │  │ «component» Application Core (Node.js / TypeScript)                    │ │ │ │
+│  │  │  │                                                                          │ │ │ │
+│  │  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │ │ │ │
+│  │  │  │  │ Services    │  │ Repositories│  │ Adapters    │  │ Middleware  │   │ │ │ │
+│  │  │  │  │             │  │             │  │             │  │             │   │ │ │ │
+│  │  │  │  │ AuthService │  │ UserRepo    │  │ Argon2      │  │ Auth        │   │ │ │ │
+│  │  │  │  │ TokenService│  │ TokenRepo   │  │ JWT         │  │ RateLimit   │   │ │ │ │
+│  │  │  │  │ UserService │  │ SessionRepo │  │ TOTP        │  │ Validator   │   │ │ │ │
+│  │  │  │  │ AuditService│  │ AuditRepo   │  │ Email       │  │ Logger      │   │ │ │ │
+│  │  │  │  │ MFAService  │  │ OAuthRepo   │  │ Logger      │  │ ErrorHandler│   │ │ │ │
+│  │  │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │ │ │ │
+│  │  │  └────────────────────────────────────┬──────────────────────────────────┘ │ │ │
+│  │  └───────────────────────────────────────┼──────────────────────────────────────┘ │ │
+│  │                                          │                                          │ │
+│  │  ┌───────────────────────────────────────┼──────────────────────────────────────┐ │ │
+│  │  │                    «database»         ▼                                      │ │ │
+│  │  │                                                                               │ │ │
+│  │  │  ┌─────────────────────────────────────────────────────────────────────────┐ │ │ │
+│  │  │  │ «database» MySQL 8.0 (StatefulSet)                                       │ │ │ │
+│  │  │  │                                                                          │ │ │ │
+│  │  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │ │ │ │
+│  │  │  │  │ users       │  │ roles       │  │ permissions │  │ refresh_tok │       │ │ │ │
+│  │  │  │  │             │  │             │  │             │  │             │       │ │ │ │
+│  │  │  │  │ user_roles  │  │ role_perm   │  │ audit_logs  │  │ sessions    │       │ │ │ │
+│  │  │  │  │             │  │             │  │             │  │             │       │ │ │ │
+│  │  │  │  │ oauth_*     │  │ mfa_backup  │  │ pass_hist   │  │ security_ev │       │ │ │ │
+│  │  │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │ │ │ │
+│  │  │  └─────────────────────────────────────────────────────────────────────────┘ │ │ │
+│  │  │                                    ▲                                          │ │ │
+│  │  │                                    │ replica                                  │ │ │
+│  │  │  ┌─────────────────────────────────┴─────────────────────────────────────┐ │ │ │
+│  │  │  │ «database» MySQL Replica (Read replicas)                                 │ │ │ │
+│  │  │  └─────────────────────────────────────────────────────────────────────────┘ │ │ │
+│  │  └──────────────────────────────────────────────────────────────────────────────┘ │ │
+│  │                                                                                   │ │
+│  │  ┌─────────────────────────────────────────────────────────────────────────────┐ │ │
+│  │  │ «database» Redis Cluster (StatefulSet)                                       │ │ │
+│  │  │                                                                               │ │ │
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                           │ │ │
+│  │  │  │ sessions    │  │ rate_limit  │  │ cache       │                           │ │ │
+│  │  │  │ store       │  │ counters    │  │ entries     │                           │ │ │
+│  │  │  └─────────────┘  └─────────────┘  └─────────────┘                           │ │ │
+│  │  └─────────────────────────────────────────────────────────────────────────────┘ │ │
+│  └───────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                        │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐ │
+│  │                    «node» Observability Stack                                    │ │
+│  │                                                                                   │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │ │
+│  │  │ Prometheus      │  │ Grafana         │  │ Loki/ELK        │  │ Jaeger      │ │ │
+│  │  │ (metrics)       │  │ (dashboards)    │  │ (logs)          │  │ (tracing)   │ │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────┘ │ │
+│  └───────────────────────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     │ network
+                                     ▼
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                              «device» External Services                                │
+│                                                                                        │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐    │
+│  │ SMTP Server     │  │ HashiCorp Vault │  │ SonarQube       │  │ Cloud       │    │
+│  │ (Email)         │  │ (Secrets)       │  │ (Code Quality)  │  │ Provider    │    │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────┘    │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
