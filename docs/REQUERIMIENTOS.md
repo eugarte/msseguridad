@@ -17,7 +17,13 @@
 3. [Requerimientos No Funcionales](#3-requerimientos-no-funcionales)
 4. [Reglas de Negocio](#4-reglas-de-negocio)
 5. [Casos de Uso](#5-casos-de-uso)
-6. [Matriz de Trazabilidad](#6-matríz-de-trazabilidad)
+6. [Matriz de Trazabilidad Completa](#6-matríz-de-trazabilidad-completa)
+   - 6.1 [Trazabilidad RF → Casos de Uso → Componentes](#61-trazabilidad-rf--casos-de-uso--componentes)
+   - 6.2 [Trazabilidad RNF → Requisitos Técnicos](#62-trazabilidad-rnf--requisitos-técnicos)
+   - 6.3 [Trazabilidad Reglas de Negocio → Implementación](#63-trazabilidad-reglas-de-negocio--implementación)
+   - 6.4 [Trazabilidad Entidades → Tablas DB](#64-trazabilidad-entidades--tablas-db)
+   - 6.5 [Trazabilidad Casos de Uso → Endpoints API](#65-trazabilidad-casos-de-uso--endpoints-api)
+   - 6.6 [Trazabilidad Riesgos OWASP → Mitigaciones](#66-trazabilidad-riesgos-owasp--mitigaciones)
 
 ---
 
@@ -656,17 +662,126 @@ Permissions-Policy: geolocation=(), microphone=(), camera=()
 
 ---
 
-## 6. MATRIZ DE TRAZABILIDAD
+## 6. MATRIZ DE TRAZABILIDAD COMPLETA
 
-### 6.1 Trazabilidad RF → Casos de Uso → Componentes
+### 6.1 Trazabilidad RF → Casos de Uso → Componentes → Arquitectura
 
-| RF ID | Descripción | Caso de Uso | Componente | Prioridad |
-|-------|-------------|-------------|------------|-----------|
-| RF-001 | Registro de usuarios | CU-003 | UserService | Alta |
-| RF-002 | Login | CU-001 | AuthService | Alta |
-| RF-003 | Logout | CU-004 | TokenService | Alta |
-| RF-004 | Recuperar password | CU-005 | EmailService | Alta |
-| RF-005 | MFA | CU-001 | MfaService | Media |
+| RF ID | Descripción | Caso de Uso | Componente / Servicio | Capa Arquitectura | Entidades / Tablas DB | Prioridad |
+|-------|-------------|-------------|----------------------|-------------------|----------------------|-----------|
+| **RF-001** | Registro de usuarios | CU-003 | UserService, AuthController | Application / Presentation | `users`, `password_history` | Alta |
+| **RF-002** | Login | CU-001 | AuthService, TokenService | Application | `users`, `user_sessions`, `refresh_tokens`, `audit_logs` | Alta |
+| **RF-003** | Logout | CU-004 | TokenService, SessionService | Application | `user_sessions`, `refresh_tokens` | Alta |
+| **RF-004** | Recuperar password | CU-005 | EmailService, AuthService | Infrastructure / Application | `users`, `audit_logs` | Alta |
+| **RF-005** | MFA | CU-001 | MfaService, AuthService | Application | `users`, `mfa_backup_codes` | Media |
+| **RF-006** | Roles (RBAC) | CU-006 | RoleService, PermissionService | Application | `roles`, `user_roles` | Alta |
+| **RF-007** | Permisos (ABAC) | CU-007 | PermissionService, PermissionEvaluator | Domain / Application | `permissions`, `role_permissions` | Media |
+| **RF-008** | Check permission | CU-008 | AuthMiddleware, PermissionService | Infrastructure / Application | `permissions` (cache Redis) | Alta |
+| **RF-009** | OAuth2 Auth Code | CU-009 | OAuthService, OAuthController | Application / Presentation | `oauth_clients`, `oauth_authorization_codes` | Alta |
+| **RF-010** | Client Credentials | CU-010 | OAuthService | Application | `oauth_clients`, `oauth_access_tokens` | Media |
+| **RF-011** | OIDC Discovery | CU-011 | OIDCController | Presentation | (config) | Media |
+| **RF-012** | Gestión clientes OAuth | CU-012 | ClientService, AdminController | Application / Presentation | `oauth_clients` | Baja |
+| **RF-013** | Sesiones activas | CU-013 | SessionService, UserController | Application / Presentation | `user_sessions` | Media |
+| **RF-014** | Rotación tokens | CU-002 | TokenService, TokenRotationService | Domain / Application | `refresh_tokens` | Alta |
+| **RF-015** | Expiración sesiones | CU-002 | TokenService, SessionCleanup | Application | `user_sessions`, `refresh_tokens` | Media |
+| **RF-016** | Audit logging | Todos | AuditService, AuditLogRepository | Infrastructure | `audit_logs` | Alta |
+| **RF-017** | Consulta logs | CU-014 | AuditService, AdminController | Application / Presentation | `audit_logs` | Media |
+| **RF-018** | Alertas | Todos | AlertService, SecurityEventService | Infrastructure | `security_events` | Media |
+| **RF-019** | Perfil | CU-015 | UserService, UserController | Application / Presentation | `users` | Media |
+| **RF-020** | Gestión usuarios (Admin) | CU-006 | AdminController, UserService | Application / Presentation | `users`, `user_roles` | Alta |
+
+### 6.2 Trazabilidad RNF → Requisitos Técnicos → Componentes de Arquitectura
+
+| RNF ID | Requisito | Solución Técnica | Componentes Involucrados | Estado |
+|--------|-----------|------------------|-------------------------|--------|
+| **RNF-001** | Latencia < 500ms | Redis cache, pool de conexiones, índices optimizados | RedisCluster, QueryOptimizer, ConnectionPool | Diseño |
+| **RNF-002** | Throughput 1000 req/s | Horizontal scaling, load balancer, stateless | KubernetesHPA, NginxIngress, PodAutoscaler | Diseño |
+| **RNF-003** | Escalabilidad 100K concurrentes | Kubernetes, microservicios, caché distribuida | K8sDeployment, RedisCluster, ServiceMesh | Diseño |
+| **RNF-004** | Uptime 99.95% | Multi-zone deployment, health checks, circuit breakers | K8sProbes, IstioCircuitBreaker, MultiAZ | Diseño |
+| **RNF-005** | DR (RTO 1h, RPO 5min) | Backups cada 6h, replicación binlog, snapshots | MySQLReplica, VeleroBackup, CronJob | Diseño |
+| **RNF-006** | Cifrado AES-256 + TLS 1.3 | Cert-manager, Let's Encrypt, MySQL SSL | CertManager, TLSConfig, MySQLSSL | Implementado |
+| **RNF-007** | Secrets management | HashiCorp Vault, external secrets operator | VaultAgent, ExternalSecrets, SealedSecrets | Diseño |
+| **RNF-008** | Security headers | Helmet.js middleware configurado | HelmetMiddleware, SecurityHeaders | Implementado |
+| **RNF-009** | Rate limiting | express-rate-limit + Redis store | RateLimitMiddleware, RedisStore | Implementado |
+| **RNF-010** | Validación de inputs | Joi/Zod schemas, express-validator | ValidationMiddleware, SchemaValidator | Implementado |
+| **RNF-011** | Compliance OWASP ASVS | SAST/DAST en CI/CD, pentesting | SonarQube, OWASPZAP, Snyk, Semgrep | Pendiente |
+| **RNF-012** | UX multi-idioma | i18n framework, detección de idioma | I18nService, LocaleMiddleware | Diseño |
+| **RNF-013** | Documentación API | OpenAPI 3.0, Swagger UI, Redoc | OpenAPIDocs, SwaggerController | En progreso |
+| **RNF-014** | Testing 80% cobertura | Jest + Supertest + TestContainers | TestSuite, CoverageReporter, MockExtender | En progreso |
+| **RNF-015** | Observability | Prometheus, Grafana, Loki, Jaeger | MetricsCollector, Logger, Tracer | Diseño |
+| **RNF-016** | APIs RESTful | Express.js, REST conventions, HATEOAS | RESTController, APIGateway | Implementado |
+| **RNF-017** | OAuth2/OIDC | node-oauth2-server, JWT RS256, JWKS | OAuth2Server, JwtService, JwksEndpoint | Implementado |
+
+### 6.3 Trazabilidad Reglas de Negocio → Implementación
+
+| Regla ID | Regla de Negocio | Implementación Técnica | Ubicación Código | Test Asociado |
+|----------|------------------|----------------------|------------------|---------------|
+| RN-001 | Password 12 chars, complejidad | PasswordPolicyService.validate() | `domain/services/PasswordPolicyService.ts` | `password-policy.test.ts` |
+| RN-002 | No reutilizar últimas 5 passwords | PasswordHistoryRepository.check() | `infrastructure/repositories/PasswordHistoryRepository.ts` | `password-history.test.ts` |
+| RN-003 | Expiración 90 días admin | Scheduler job + User.passwordChangedAt | `application/jobs/PasswordExpirationJob.ts` | `password-expiration.test.ts` |
+| RN-004 | Bloqueo 15 min tras 5 intentos | AuthService.login() + User.failedAttempts | `application/services/AuthService.ts` | `account-lockout.test.ts` |
+| RN-005 | Max 10 sesiones concurrentes | SessionService.create() + contador | `application/services/SessionService.ts` | `session-limit.test.ts` |
+| RN-006 | Herencia de roles | RoleService.getEffectivePermissions() | `domain/services/PermissionEvaluator.ts` | `role-inheritance.test.ts` |
+| RN-007 | Deny prevalece sobre allow | PermissionEvaluator.evaluate() | `domain/services/PermissionEvaluator.ts` | `permission-conflict.test.ts` |
+| RN-008 | Jerarquía en gestión | AdminController.checkHierarchy() | `interfaces/http/controllers/AdminController.ts` | `hierarchy-check.test.ts` |
+| RN-009 | Access token 15 min | JwtService.sign() con exp | `infrastructure/adapters/JwtAdapter.ts` | `token-expiration.test.ts` |
+| RN-010 | Refresh token 7 días | RefreshToken.expiresAt calculado | `domain/entities/RefreshToken.ts` | `refresh-expiration.test.ts` |
+| RN-011 | Detección reuso = revocar familia | TokenService.rotate() + detect reuse | `application/services/TokenService.ts` | `token-reuse.test.ts` |
+| RN-012 | Sesión inactiva 30 min | Session.touch() + middleware | `infrastructure/http/middleware/SessionTimeout.ts` | `session-timeout.test.ts` |
+| RN-013 | Retención logs 1 año | Particionamiento audit_logs + archive | `infrastructure/jobs/LogArchivalJob.ts` | (integration) |
+| RN-014 | Logs inmutables | AuditLogRepository append-only | `infrastructure/repositories/AuditLogRepository.ts` | `audit-immutable.test.ts` |
+| RN-015 | Alertas automáticas | AlertService.evaluateConditions() | `infrastructure/services/AlertService.ts` | `alert-trigger.test.ts` |
+
+### 6.4 Trazabilidad Entidades de Negocio → Tablas de Base de Datos
+
+| Entidad Dominio | Atributos Principales | Tabla(s) DB | Relaciones | Índices Principales |
+|-----------------|----------------------|-------------|------------|---------------------|
+| User | id, email, password, status, mfaEnabled, lockedUntil | `users` | 1:N RefreshTokens, Sessions, AuditLogs | `email` (UQ), `status`, `locked_until` |
+| Role | id, name, slug, hierarchyLevel, isDefault | `roles` | N:M User (via user_roles), N:M Permission | `slug` (UQ), `hierarchy_level` |
+| Permission | id, resource, action, slug, conditions | `permissions` | N:M Role (via role_permissions) | `slug` (UQ), `resource+action` (UQ) |
+| RefreshToken | id, tokenHash, familyId, isRevoked, expiresAt | `refresh_tokens` | N:1 User | `token_hash` (UQ), `user_id+is_revoked`, `family_id` |
+| UserSession | id, sessionToken, ipAddress, isActive, expiresAt | `user_sessions` | N:1 User, 1:1 RefreshToken | `session_token` (UQ), `user_id+is_active` |
+| AuditLog | id, userId, action, resource, status, createdAt | `audit_logs` | N:1 User (nullable) | `user_id+created_at`, `action+created_at` (partitioned) |
+| MfaBackupCode | id, codeHash, usedAt | `mfa_backup_codes` | N:1 User | `code_hash` (UQ), `user_id+used_at` |
+| OAuthClient | id, clientId, clientSecret, redirectUris, grants | `oauth_clients` | 1:N AuthCodes, AccessTokens | `client_id` (UQ) |
+| OAuthAuthCode | id, code, expiresAt, consumedAt, codeChallenge | `oauth_authorization_codes` | N:1 Client, N:1 User | `code` (UQ), `expires_at` |
+| OAuthAccessToken | id, token, expiresAt, revokedAt | `oauth_access_tokens` | N:1 Client, N:1 User | `token` (UQ), `expires_at` |
+| PasswordHistory | id, passwordHash, changedAt | `password_history` | N:1 User | `user_id+changed_at` |
+| SecurityEvent | id, eventType, severity, acknowledged | `security_events` | N:1 User (nullable) | `created_at`, `event_type`, `severity` |
+
+### 6.5 Trazabilidad Casos de Uso → Endpoints API → Tests
+
+| Caso de Uso | Endpoint API | Método HTTP | Componentes Testeados | Tipo de Test |
+|-------------|--------------|-------------|----------------------|--------------|
+| CU-001 Login | `/auth/login` | POST | AuthController, AuthService, UserRepository | Unit, Integration, E2E |
+| CU-001 MFA | `/auth/mfa/verify` | POST | MfaService, TotpAdapter, UserRepository | Unit, Integration |
+| CU-002 Refresh Token | `/auth/refresh` | POST | TokenService, TokenRepository, JwtAdapter | Unit, Integration |
+| CU-003 Register | `/auth/register` | POST | UserService, EmailAdapter, PasswordPolicy | Unit, Integration, E2E |
+| CU-004 Logout | `/auth/logout` | POST | TokenService (revoke), SessionService | Unit, Integration |
+| CU-005 Recover Password | `/auth/forgot-password` | POST | EmailService, TokenService (reset token) | Integration |
+| CU-006 User CRUD | `/admin/users/*` | CRUD | AdminController, UserService, RoleService | Integration, E2E |
+| CU-007 Role Management | `/admin/roles/*` | CRUD | RoleController, PermissionService | Integration |
+| CU-008 Check Permission | `/auth/check-permission` | GET | AuthMiddleware, PermissionEvaluator | Unit, Integration |
+| CU-009 OAuth Authorize | `/oauth/authorize` | GET | OAuthService, OAuthController | Integration |
+| CU-010 OAuth Token | `/oauth/token` | POST | OAuthService, TokenService | Integration |
+| CU-011 OIDC Discovery | `/.well-known/openid-configuration` | GET | OIDCController | Unit |
+| CU-013 List Sessions | `/users/me/sessions` | GET | SessionService, SessionRepository | Unit, Integration |
+| CU-014 Audit Query | `/admin/audit-logs` | GET | AuditService, AuditRepository | Integration |
+| CU-015 User Profile | `/users/me` | GET/PATCH | UserController, UserService | Unit, Integration |
+
+### 6.6 Trazabilidad Riesgos de Seguridad → Mitigaciones → Verificación
+
+| Riesgo OWASP | Requisito | Mitigación Implementada | Verificación (Test/Scan) |
+|--------------|-----------|------------------------|--------------------------|
+| A01 - Broken Access Control | RF-006, RF-007, RF-008 | RBAC + ABAC, middleware auth, least privilege | Unit: permission-evaluator.test.ts |
+| A02 - Cryptographic Failures | RNF-006, RN-001 | Argon2id, AES-256, TLS 1.3, RS256 JWT | SAST: SonarQube, Snyk |
+| A03 - Injection | RNF-010 | Parameterized queries (TypeORM), input validation | DAST: OWASP ZAP, SQLMap |
+| A04 - Insecure Design | RN-004, RN-009, RN-011 | Rate limiting, token rotation, account lockout | Integration: security-ratelimit.test.ts |
+| A05 - Security Misconfiguration | RNF-008, RNF-009 | Helmet headers, security middleware, env validation | SAST: ESLint Security |
+| A06 - Vulnerable Components | RNF-011 | npm audit, Snyk SCA, Dependabot, SBOM | SCA: Snyk, Trivy |
+| A07 - ID and Auth Failures | RF-002, RF-005, RF-014 | MFA, secure session, token rotation, logout | Integration: auth-flow.test.ts |
+| A08 - Data Integrity Failures | RN-002, RN-014 | Password history, immutable audit logs, signatures | Unit: audit-immutable.test.ts |
+| A09 - Logging Failures | RF-016, RF-017, RF-018 | Structured logging, audit trail, security alerts | Integration: audit-logging.test.ts |
+| A10 - SSRF | RNF-010 | URL validation, allowlists, request sanitization | SAST: Semgrep SSRF rules |
 | RF-006 | Roles | CU-006 | RoleService | Alta |
 | RF-007 | Permisos | CU-007 | PermissionService | Media |
 | RF-008 | Check permission | CU-008 | AuthMiddleware | Alta |
