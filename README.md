@@ -2,6 +2,8 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-blue)](.github/workflows/cicd.yml)
+[![Security](https://img.shields.io/badge/Security-DevSecOps-green)](SECURITY_CONFIG.md)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Microservicio de seguridad y autenticación robusto, escalable y compatible con estándares OAuth2/OIDC, construido con **Node.js**, **TypeScript**, **Clean Architecture** y **Hexagonal Architecture**.
@@ -17,6 +19,8 @@ Microservicio de seguridad y autenticación robusto, escalable y compatible con 
 - [Desarrollo](#-desarrollo)
 - [Testing](#-testing)
 - [Calidad de Código](#-calidad-de-código)
+- [DevSecOps](#-devsecops)
+- [Kubernetes](#-kubernetes)
 - [Documentación](#-documentación)
 - [Contribución](#-contribución)
 
@@ -316,6 +320,117 @@ El pipeline CI/CD ejecuta:
 
 ---
 
+## 🔒 DevSecOps
+
+### Pipeline CI/CD Completo
+
+Pipeline de 7 fases implementado en `.github/workflows/cicd.yml`:
+
+```
+┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+│  LINT   │──▶│SECURITY │──▶│  TEST   │──▶│ SONAR   │──▶│  BUILD  │
+│  CHECK  │   │  SCAN   │   │         │   │  QUBE   │   │         │
+└─────────┘   └─────────┘   └─────────┘   └─────────┘   └────┬────┘
+                                                             │
+              ┌─────────┐   ┌─────────┐                    │
+              │  PROD   │◀──│ STAGING │◀─────────────────────┘
+              │ DEPLOY  │   │ DEPLOY  │
+              └─────────┘   └─────────┘
+```
+
+### Herramientas de Seguridad
+
+| Herramienta | Tipo | Descripción |
+|-------------|------|-------------|
+| **SonarQube** | SAST | Análisis continuo de calidad y seguridad |
+| **Semgrep** | SAST | Reglas personalizadas, OWASP Top 10 |
+| **Snyk** | SCA/SAST | Vulnerabilidades en dependencias |
+| **npm audit** | SCA | Auditoría de paquetes npm |
+| **GitLeaks** | Secrets | Detección de credenciales hardcodeadas |
+| **ESLint Security** | SAST | Patrones inseguros en código |
+| **Trivy** | Container | Escaneo de imágenes Docker |
+| **Syft** | SBOM | Generación de Software Bill of Materials |
+
+### Comandos de Seguridad (Makefile)
+
+```bash
+make security              # Ejecutar todos los escaneos
+make semgrep               # SAST con Semgrep
+make sonar-local           # SonarQube local con Docker
+make docker-scan           # Escanear imagen con Trivy
+make sbom                  # Generar SBOM
+make gitleaks              # Detectar secretos en código
+```
+
+### SonarQube Local
+
+```bash
+# Iniciar SonarQube con Docker
+make sonar-local
+
+# Acceder: http://localhost:9000 (admin/admin)
+```
+
+### CI Local (Simulación)
+
+```bash
+make ci-local              # Simular pipeline CI
+make ci-full               # CI completo con seguridad
+```
+
+---
+
+## ☸️ Kubernetes
+
+### Despliegue con Helm
+
+```bash
+# Instalar dependencias Helm
+make helm-deps
+
+# Desplegar a staging
+make deploy-staging
+
+# Desplegar a producción
+make deploy-production
+```
+
+### Estructura de Charts
+
+```
+k8s/helm/
+├── Chart.yaml                 # Metadata
+├── values.yaml                # Valores por defecto
+├── values-staging.yaml        # Configuración staging
+├── values-production.yaml     # Configuración producción
+└── templates/
+    ├── deployment.yaml        # Deployment principal
+    ├── service.yaml           # Service ClusterIP
+    ├── ingress.yaml           # Ingress con TLS
+    ├── hpa.yaml               # Autoscaling
+    ├── pdb.yaml               # Pod Disruption Budget
+    └── networkpolicy.yaml     # Políticas de red
+```
+
+### Características de Seguridad
+
+- 🔐 **Security Contexts**: Non-root, read-only filesystem
+- 🔐 **Network Policies**: Restricciones ingress/egress
+- 📊 **Pod Disruption Budgets**: Alta disponibilidad
+- 📊 **HPA**: Autoscaling con behavior personalizado
+- 🌐 **Ingress**: Rate limiting, TLS automático
+- 📈 **Monitoring**: Prometheus ServiceMonitor
+
+### Requisitos
+
+- Kubernetes 1.24+
+- Helm 3.x
+- Ingress Controller (nginx)
+- cert-manager (para TLS)
+- Prometheus Operator (para métricas)
+
+---
+
 ## 📚 Documentación
 
 La documentación completa está en la carpeta `docs/`:
@@ -325,8 +440,9 @@ La documentación completa está en la carpeta `docs/`:
 | `INFORME_ARQUITECTURA.md` | Arquitectura de alto nivel (C4 Model) |
 | `PROPUESTA_IMPLEMENTACION.md` | Propuesta técnica completa con UML |
 | `REQUERIMIENTOS.md` | RFs, RNFs, reglas de negocio, trazabilidad |
-| `HERRAMIENTAS_CALIDAD_SEGURIDAD.md` | Guía de herramientas de calidad |
+| `HERRAMIENTAS_CALIDAD_SEGURIDAD.md` | Guía de herramientas de calidad y seguridad |
 | `MODELO_DATOS_MYSQL_NODEJS.md` | DDL completo + entidades TypeORM |
+| `RESUMEN_IMPLEMENTACION.md` | Resumen de implementación de fases |
 | `DOCUMENTOS_SALIDA.md` | Checklist de entregables |
 
 ### API Documentation

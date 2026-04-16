@@ -1,6 +1,14 @@
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
 import { logger } from '../services/logger';
+import {
+  User,
+  Role,
+  Permission,
+  RefreshToken,
+  UserSession,
+  AuditLog,
+} from '../../domain/entities';
 
 dotenv.config();
 
@@ -13,7 +21,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'msseguridad',
   
   // TypeORM configuration
-  synchronize: process.env.DB_SYNC === 'true',
+  synchronize: process.env.NODE_ENV === 'development' && process.env.DB_SYNC === 'true',
   logging: process.env.DB_LOGGING === 'true',
   
   // Connection pool
@@ -24,7 +32,7 @@ export const AppDataSource = new DataSource({
   },
   
   // Entity and migration paths
-  entities: [__dirname + '/../../domain/entities/*.ts'],
+  entities: [User, Role, Permission, RefreshToken, UserSession, AuditLog],
   migrations: [__dirname + '/../database/migrations/*.ts'],
   migrationsRun: false,
   

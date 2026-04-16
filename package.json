@@ -26,7 +26,7 @@
     "db:migrate": "typeorm-ts-node-commonjs migration:run -d src/infrastructure/config/database.ts",
     "db:migrate:revert": "typeorm-ts-node-commonjs migration:revert -d src/infrastructure/config/database.ts",
     "db:generate": "typeorm-ts-node-commonjs migration:generate -d src/infrastructure/config/database.ts",
-    "db:seed": "tsx src/infrastructure/database/seeds/main.seed.ts",
+    "db:seed": "tsx src/infrastructure/database/run-seed.ts",
     "sonar:scan": "sonar-scanner"
   },
   "dependencies": {
@@ -85,7 +85,6 @@
     "jest-mock-extended": "^3.0.5",
     "lint-staged": "^15.2.2",
     "prettier": "^3.2.5",
-    "sonar-scanner": "^3.5.0",
     "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",

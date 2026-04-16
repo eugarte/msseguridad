@@ -5,16 +5,15 @@ import cors from 'cors';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { DataSource } from 'typeorm';
 
-import { AppDataSource } from './infrastructure/config/database';
-import { redisClient } from './infrastructure/config/redis';
-import { logger } from './infrastructure/services/logger';
-import { errorHandler } from './infrastructure/http/middleware/error-handler';
-import { requestLogger } from './infrastructure/http/middleware/request-logger';
-import { metricsMiddleware } from './infrastructure/http/middleware/metrics';
+import { AppDataSource } from '@infrastructure/config/database';
+import { redisClient } from '@infrastructure/config/redis';
+import { logger } from '@infrastructure/services/logger';
+import { errorHandler } from '@infrastructure/http/middleware/error-handler';
+import { requestLogger } from '@infrastructure/http/middleware/request-logger';
+import { metricsMiddleware } from '@infrastructure/http/middleware/metrics';
+import authRoutes from '@interfaces/http/routes/auth.routes';
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
@@ -76,10 +75,10 @@ app.use(metricsMiddleware);
 // Health checks
 app.get('/health', async (req, res) => {
   try {
-    // Check database
-    await AppDataSource.query('SELECT 1');
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.query('SELECT 1');
+    }
     
-    // Check Redis
     await redisClient.ping();
     
     res.status(200).json({
@@ -87,7 +86,7 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
       services: {
-        database: 'connected',
+        database: AppDataSource.isInitialized ? 'connected' : 'not_initialized',
         cache: 'connected',
       },
     });
@@ -102,23 +101,16 @@ app.get('/health', async (req, res) => {
 });
 
 app.get('/ready', async (req, res) => {
-  // Liveness probe - basic check
   res.status(200).json({ ready: true });
 });
 
 // Metrics endpoint
 app.get('/metrics', (req, res) => {
-  // Prometheus metrics will be exposed here
   res.status(200).send('# Metrics endpoint placeholder');
 });
 
-// API routes placeholder
-app.use('/api/v1', (req, res) => {
-  res.json({ message: 'msseguridad API v1', status: 'coming soon' });
-});
-
-// Error handling
-app.use(errorHandler);
+// API Routes
+app.use('/api/v1/auth', authRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -128,16 +120,27 @@ app.use((req, res) => {
   });
 });
 
+// Error handling
+app.use(errorHandler);
+
 // Database connection and server start
 async function bootstrap() {
   try {
-    // Connect to database
-    await AppDataSource.initialize();
-    logger.info('Database connected successfully');
+    // Connect to database (only if not already initialized)
+    if (!AppDataSource.isInitialized) {
+      await AppDataSource.initialize();
+      logger.info('Database connected successfully');
+    } else {
+      logger.info('Database already initialized');
+    }
 
-    // Connect to Redis
-    await redisClient.connect();
-    logger.info('Redis connected successfully');
+    // Connect to Redis (only if not already connected)
+    if (redisClient.status !== 'ready') {
+      await redisClient.connect();
+      logger.info('Redis connected successfully');
+    } else {
+      logger.info('Redis already connected');
+    }
 
     // Start server
     app.listen(PORT, () => {
@@ -147,8 +150,9 @@ async function bootstrap() {
         version: process.env.npm_package_version || '1.0.0',
       });
     });
-  } catch (error) {
-    logger.error('Failed to start server', { error });
+  } catch (error: any) {
+    console.error('ERROR DETAILS:', error);
+    logger.error('Failed to start server', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
