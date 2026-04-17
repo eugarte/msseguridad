@@ -2,7 +2,7 @@ import { LogoutUserRequest } from '@application/dtos/auth.dto';
 import { AppDataSource } from '@infrastructure/config/database';
 import { RefreshToken, TokenStatus } from '@domain/entities/refresh-token';
 import { AuditLog, AuditAction, AuditStatus } from '@domain/entities/audit-log';
-import { redisClient } from '@infrastructure/config/redis';
+import { cacheClient } from '@infrastructure/config/cache';
 import argon2 from 'argon2';
 import { logger } from '@infrastructure/services/logger';
 
@@ -23,10 +23,11 @@ export class LogoutUserUseCase {
           }
         );
         
-        const sessionKeys = await redisClient.keys(`session:${request.userId}:*`);
-        if (sessionKeys.length > 0) {
-          await redisClient.del(...sessionKeys);
-        }
+        // Clear user sessions from memory cache (single instance only)
+        // NOTE: In multi-instance setup, this only clears local cache
+        await cacheClient.deleteSession(`user:${request.userId}:*`);
+        
+        logger.info(`User ${request.userId} sessions cleared from local cache`);
         
         await auditLogRepository.save({
           userId: request.userId,

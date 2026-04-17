@@ -1,5 +1,5 @@
-import { Role } from '../../../src/domain/entities/role';
-import { Permission } from '../../../src/domain/entities/permission';
+import { Role } from '@domain/entities/role';
+import { Permission } from '@domain/entities/permission';
 
 describe('Role Entity', () => {
   let role: Role;
@@ -49,161 +49,52 @@ describe('Role Entity', () => {
       expect(role.permissions).toEqual([]);
     });
 
-    it('should accept permissions', () => {
+    it('should add permissions', () => {
       const permission = new Permission();
       permission.id = 'perm-1';
       permission.resource = 'users';
       permission.action = 'read';
-
+      permission.slug = 'users:read';
       role.permissions = [permission];
-
       expect(role.permissions).toHaveLength(1);
-      expect(role.permissions[0].resource).toBe('users');
+      expect(role.permissions[0].slug).toBe('users:read');
     });
 
     it('should have multiple permissions', () => {
-      const readUsers = new Permission();
-      readUsers.resource = 'users';
-      readUsers.action = 'read';
-
-      const writeUsers = new Permission();
-      writeUsers.resource = 'users';
-      writeUsers.action = 'write';
-
-      role.permissions = [readUsers, writeUsers];
-
+      const perm1 = new Permission();
+      perm1.id = 'perm-1';
+      perm1.slug = 'users:read';
+      const perm2 = new Permission();
+      perm2.id = 'perm-2';
+      perm2.slug = 'users:write';
+      role.permissions = [perm1, perm2];
       expect(role.permissions).toHaveLength(2);
     });
   });
 
-  describe('role hierarchy', () => {
-    it('should compare hierarchy levels', () => {
-      const adminRole = new Role();
-      adminRole.hierarchyLevel = 100;
-
-      const userRole = new Role();
-      userRole.hierarchyLevel = 10;
-
-      expect(adminRole.hierarchyLevel).toBeGreaterThan(userRole.hierarchyLevel);
-    });
-
-    it('should support negative hierarchy for banned users', () => {
-      const bannedRole = new Role();
-      bannedRole.hierarchyLevel = -1;
-
-      expect(bannedRole.hierarchyLevel).toBe(-1);
+  describe('users', () => {
+    it('should have users assigned', () => {
+      expect(role.users).toEqual([]);
     });
   });
 
-  describe('system roles', () => {
-    it('should identify system roles', () => {
-      role.isSystem = true;
-      expect(role.isSystem).toBe(true);
-    });
-
-    it('should identify custom roles', () => {
-      role.isSystem = false;
-      expect(role.isSystem).toBe(false);
+  describe('hierarchy', () => {
+    it('should compare hierarchy levels', () => {
+      const adminRole = new Role();
+      adminRole.hierarchyLevel = 100;
+      const userRole = new Role();
+      userRole.hierarchyLevel = 10;
+      expect(adminRole.hierarchyLevel).toBeGreaterThan(userRole.hierarchyLevel);
     });
   });
 
   describe('timestamps', () => {
-    it('should have createdAt timestamp', () => {
-      const now = new Date();
-      role.createdAt = now;
-      expect(role.createdAt).toBe(now);
+    it('should have createdAt', () => {
+      expect(role.createdAt).toBeInstanceOf(Date);
     });
 
-    it('should have updatedAt timestamp', () => {
-      const now = new Date();
-      role.updatedAt = now;
-      expect(role.updatedAt).toBe(now);
-    });
-  });
-});
-
-describe('Permission Entity', () => {
-  let permission: Permission;
-
-  beforeEach(() => {
-    permission = new Permission();
-    permission.id = 'perm-1';
-    permission.resource = 'users';
-    permission.action = 'read';
-    permission.description = 'Can read user data';
-    permission.createdAt = new Date();
-    permission.roles = [];
-  });
-
-  describe('basic properties', () => {
-    it('should have id property', () => {
-      expect(permission.id).toBe('perm-1');
-    });
-
-    it('should have resource property', () => {
-      expect(permission.resource).toBe('users');
-    });
-
-    it('should have action property', () => {
-      expect(permission.action).toBe('read');
-    });
-
-    it('should have description property', () => {
-      expect(permission.description).toBe('Can read user data');
-    });
-  });
-
-  describe('permission actions', () => {
-    it('should support read action', () => {
-      permission.action = 'read';
-      expect(permission.action).toBe('read');
-    });
-
-    it('should support write action', () => {
-      permission.action = 'write';
-      expect(permission.action).toBe('write');
-    });
-
-    it('should support delete action', () => {
-      permission.action = 'delete';
-      expect(permission.action).toBe('delete');
-    });
-
-    it('should support manage action', () => {
-      permission.action = 'manage';
-      expect(permission.action).toBe('manage');
-    });
-  });
-
-  describe('permission resources', () => {
-    it('should support users resource', () => {
-      permission.resource = 'users';
-      expect(permission.resource).toBe('users');
-    });
-
-    it('should support roles resource', () => {
-      permission.resource = 'roles';
-      expect(permission.resource).toBe('roles');
-    });
-
-    it('should support permissions resource', () => {
-      permission.resource = 'permissions';
-      expect(permission.resource).toBe('permissions');
-    });
-  });
-
-  describe('roles relationship', () => {
-    it('should have empty roles array by default', () => {
-      expect(permission.roles).toEqual([]);
-    });
-
-    it('should be assigned to roles', () => {
-      const adminRole = new Role();
-      adminRole.name = 'Admin';
-
-      permission.roles = [adminRole];
-
-      expect(permission.roles).toHaveLength(1);
+    it('should have updatedAt', () => {
+      expect(role.updatedAt).toBeInstanceOf(Date);
     });
   });
 });

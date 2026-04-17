@@ -7,7 +7,6 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 import { AppDataSource } from '@infrastructure/config/database';
-import { redisClient } from '@infrastructure/config/redis';
 import { logger } from '@infrastructure/services/logger';
 import { errorHandler } from '@infrastructure/http/middleware/error-handler';
 import { requestLogger } from '@infrastructure/http/middleware/request-logger';
@@ -79,15 +78,13 @@ app.get('/health', async (req, res) => {
       await AppDataSource.query('SELECT 1');
     }
     
-    await redisClient.ping();
-    
     res.status(200).json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
       services: {
         database: AppDataSource.isInitialized ? 'connected' : 'not_initialized',
-        cache: 'connected',
+        cache: 'memory (lru-cache)',
       },
     });
   } catch (error) {
@@ -100,12 +97,12 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.get('/ready', async (req, res) => {
+app.get('/ready', async (_req, res) => {
   res.status(200).json({ ready: true });
 });
 
 // Metrics endpoint
-app.get('/metrics', (req, res) => {
+app.get('/metrics', (_req, res) => {
   res.status(200).send('# Metrics endpoint placeholder');
 });
 
@@ -134,13 +131,7 @@ async function bootstrap() {
       logger.info('Database already initialized');
     }
 
-    // Connect to Redis (only if not already connected)
-    if (redisClient.status !== 'ready') {
-      await redisClient.connect();
-      logger.info('Redis connected successfully');
-    } else {
-      logger.info('Redis already connected');
-    }
+    logger.info('Memory cache initialized (lru-cache)');
 
     // Start server
     app.listen(PORT, () => {
@@ -166,9 +157,6 @@ process.on('SIGTERM', async () => {
     logger.info('Database connection closed');
   }
   
-  await redisClient.quit();
-  logger.info('Redis connection closed');
-  
   process.exit(0);
 });
 
@@ -179,9 +167,6 @@ process.on('SIGINT', async () => {
     await AppDataSource.destroy();
     logger.info('Database connection closed');
   }
-  
-  await redisClient.quit();
-  logger.info('Redis connection closed');
   
   process.exit(0);
 });

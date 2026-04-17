@@ -1,74 +1,127 @@
 import { Request, Response, NextFunction } from 'express';
-import { JwtService } from '@infrastructure/services/jwt.service';
-import { AppDataSource } from '@infrastructure/config/database';
-import { User } from '@domain/entities/user';
-import { redisClient } from '@infrastructure/config/redis';
+import { JwtService } from '../../../infrastructure/services/jwt.service';
 
-export interface AuthenticatedRequest extends Request {
-  user?: { id: string; email: string; roles: string[] };
+// Extend Express Request interface
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string; email: string; roles: string[]; permissions?: string[] };
+    }
+  }
 }
 
 const jwtService = new JwtService();
 
-export async function authenticateToken(
-  req: AuthenticatedRequest,
+/**
+ * Middleware to authenticate JWT token
+ */
+export async function authMiddleware(
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    res.status(401).json({ error: 'Access token required' });
+  if (!authHeader) {
+    req.user = undefined;
+    next();
     return;
   }
 
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    res.status(401).json({ error: 'Unauthorized', message: 'Invalid token format' });
+    return;
+  }
+
+  const token = parts[1];
+
   try {
-    const payload = jwtService.verifyToken(token);
-    const isBlacklisted = await redisClient.get(`blacklist:${payload.jti}`);
-    if (isBlacklisted) {
-      res.status(401).json({ error: 'Token has been revoked' });
-      return;
-    }
-
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: payload.sub },
-      relations: ['roles'],
-    });
-
-    if (!user || user.status !== 'active') {
-      res.status(401).json({ error: 'User not found or inactive' });
-      return;
-    }
-
+    const payload = await jwtService.verify(token);
+    
     req.user = {
-      id: user.id,
-      email: user.email,
-      roles: user.roles?.map(r => r.slug) || [],
+      id: payload.sub,
+      email: payload.email || '',
+      roles: payload.roles || [],
+      permissions: payload.permissions || [],
     };
-
+    
     next();
   } catch (error: any) {
-    if (error.name === 'TokenExpiredError') {
-      res.status(401).json({ error: 'Token expired' });
-      return;
+    const message = error.message || '';
+    
+    if (message.toLowerCase().includes('expired')) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Token has expired' });
+    } else {
+      res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
     }
-    res.status(403).json({ error: 'Invalid token' });
   }
 }
 
-export function requireRoles(roles: string[]) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+/**
+ * Middleware to require authentication
+ */
+export function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+    return;
+  }
+  next();
+}
+
+/**
+ * Middleware factory to require specific role(s)
+ */
+export function requireRole(roles: string | string[]) {
+  const requiredRoles = Array.isArray(roles) ? roles : [roles];
+  
+  return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: 'Authentication required' });
+      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
       return;
     }
-    const hasRole = roles.some(role => req.user!.roles.includes(role));
+    
+    const hasRole = req.user.roles.some(role => requiredRoles.includes(role));
+    
     if (!hasRole) {
-      res.status(403).json({ error: 'Insufficient permissions' });
+      res.status(403).json({ error: 'Forbidden', message: 'Insufficient permissions' });
       return;
     }
+    
     next();
   };
 }
+
+/**
+ * Middleware factory to require specific permission(s)
+ */
+export function requirePermission(permissions: string | string[]) {
+  const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
+  
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' });
+      return;
+    }
+    
+    const userPermissions = req.user.permissions || [];
+    const hasPermissions = requiredPermissions.every(p => userPermissions.includes(p));
+    
+    if (!hasPermissions) {
+      res.status(403).json({ 
+        error: 'Forbidden', 
+        message: `Missing required permission: ${requiredPermissions.join(', ')}` 
+      });
+      return;
+    }
+    
+    next();
+  };
+}
+
+// Export alias for backward compatibility
+export { authMiddleware as authenticateToken };

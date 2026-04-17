@@ -1,53 +1,43 @@
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../../services/logger';
-
-export interface AppError extends Error {
-  statusCode?: number;
-  isOperational?: boolean;
-  code?: string;
-}
+import { DomainError } from '../../domain/errors/domain-error';
+import { logger } from '../services/logger';
 
 export function errorHandler(
-  err: AppError,
-  req: Request,
+  err: Error,
+  _req: Request,
   res: Response,
   _next: NextFunction
 ): void {
-  const statusCode = err.statusCode || 500;
-  const isOperational = err.isOperational || false;
+  logger.error('Error occurred', { error: err.message, stack: err.stack });
 
-  // Log error
-  logger.error('Error occurred', {
-    error: err.message,
-    stack: err.stack,
-    statusCode,
-    path: req.path,
-    method: req.method,
-    ip: req.ip,
-    userId: (req as any).user?.id,
+  if (err instanceof DomainError) {
+    res.status(err.statusCode).json({
+      error: err.message,
+      code: err.code,
+    });
+    return;
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    res.status(401).json({ error: 'Token expired' });
+    return;
+  }
+
+  // TypeORM errors
+  if (err.name === 'QueryFailedError') {
+    res.status(500).json({ error: 'Database error' });
+    return;
+  }
+
+  // Default error
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.status(500).json({
+    error: isProduction ? 'Internal server error' : err.message,
   });
-
-  // Don't leak error details in production
-  const message = process.env.NODE_ENV === 'production' && !isOperational
-    ? 'Internal Server Error'
-    : err.message;
-
-  res.status(statusCode).json({
-    error: message,
-    code: err.code || 'INTERNAL_ERROR',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
-}
-
-// Helper to create operational errors
-export function createError(
-  message: string,
-  statusCode: number,
-  code?: string
-): AppError {
-  const error = new Error(message) as AppError;
-  error.statusCode = statusCode;
-  error.isOperational = true;
-  error.code = code;
-  return error;
 }

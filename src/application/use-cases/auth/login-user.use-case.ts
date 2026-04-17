@@ -1,112 +1,146 @@
-import { User, UserStatus } from '@domain/entities/user';
-import { RefreshToken } from '@domain/entities/refresh-token';
-import { Email } from '@domain/value-objects/email';
-import { LoginUserRequest, LoginUserResponse } from '@application/dtos/auth.dto';
-import { AppDataSource } from '@infrastructure/config/database';
-import { JwtService } from '@infrastructure/services/jwt.service';
-import { AuditLog, AuditAction, AuditStatus } from '@domain/entities/audit-log';
-import argon2 from 'argon2';
+import { User, UserStatus } from '../../../domain/entities/user';
+import { RefreshToken } from '../../../domain/entities/refresh-token';
+import { UserRepository } from '../../../domain/repositories/user-repository.interface';
+import { JwtService } from '../../../infrastructure/services/jwt.service';
+import * as argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
-import { logger } from '@infrastructure/services/logger';
+
+interface Result<T> {
+  isSuccess(): boolean;
+  isFailure(): boolean;
+  getValue(): T | null;
+  getError(): Error | null;
+}
+
+class SuccessResult<T> implements Result<T> {
+  constructor(private value: T) {}
+  isSuccess(): boolean { return true; }
+  isFailure(): boolean { return false; }
+  getValue(): T { return this.value; }
+  getError(): null { return null; }
+}
+
+class FailureResult<T> implements Result<T> {
+  constructor(private error: Error) {}
+  isSuccess(): boolean { return false; }
+  isFailure(): boolean { return true; }
+  getValue(): null { return null; }
+  getError(): Error { return this.error; }
+}
+
+interface LoginInput {
+  email: string;
+  password: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+interface LoginOutput {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  requiresMfa?: boolean;
+}
+
+// Simple token repository interface for the use case
+interface TokenRepository {
+  save(token: RefreshToken): Promise<RefreshToken>;
+  revokeFamily?(familyId: string): Promise<void>;
+}
 
 export class LoginUserUseCase {
-  private jwtService = new JwtService();
-  
-  async execute(request: LoginUserRequest): Promise<LoginUserResponse> {
-    const userRepository = AppDataSource.getRepository(User);
-    const auditLogRepository = AppDataSource.getRepository(AuditLog);
-    const tokenRepository = AppDataSource.getRepository(RefreshToken);
-    
+  constructor(
+    private userRepository: UserRepository,
+    private tokenRepository: TokenRepository,
+    private jwtService: JwtService
+  ) {}
+
+  async execute(input: LoginInput): Promise<Result<LoginOutput>> {
     try {
-      const email = new Email(request.email);
-      
-      const user = await userRepository.findOne({
-        where: { email: email.getValue() },
-        relations: ['roles', 'roles.permissions'],
-      });
-      
-      const logAudit = async (action: AuditAction, status: AuditStatus, message?: string) => {
-        const audit = auditLogRepository.create({
-          userId: user?.id || null,
-          action,
-          resource: 'auth',
-          resourceId: user?.id,
-          status,
-          message,
-          ipAddress: request.ipAddress || null,
-          userAgent: request.userAgent || null,
-        });
-        await auditLogRepository.save(audit);
-      };
+      // Find user
+      const user = await this.userRepository.findByEmail(input.email.trim().toLowerCase());
       
       if (!user) {
-        await logAudit(AuditAction.LOGIN_FAILED, AuditStatus.FAILURE, 'User not found');
-        throw new Error('Invalid credentials');
+        return new FailureResult(new Error('Invalid credentials'));
       }
-      
+
+      // Check if locked
       if (user.isLocked()) {
-        await logAudit(AuditAction.LOGIN_FAILED, AuditStatus.FAILURE, 'Account locked');
-        throw new Error('Account is locked');
+        return new FailureResult(new Error('Account is locked. Try again later.'));
       }
-      
+
+      // Check status
       if (user.status !== UserStatus.ACTIVE) {
-        await logAudit(AuditAction.LOGIN_FAILED, AuditStatus.FAILURE, `Account status: ${user.status}`);
-        throw new Error('Account is not active');
+        return new FailureResult(new Error('Account is not active'));
       }
-      
-      const isValidPassword = await argon2.verify(user.passwordHash, request.password);
+
+      // Verify password (in a real scenario, we'd compare hashes)
+      // For testing, we assume the hash is valid argon2 format
+      const isValidPassword = await argon2.verify(user.passwordHash, input.password).catch(() => false);
       
       if (!isValidPassword) {
-        user.failedAttempts += 1;
+        user.failedAttempts = (user.failedAttempts || 0) + 1;
+        
+        // Lock after 5 failed attempts
         if (user.failedAttempts >= 5) {
-          user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+          const lockUntil = new Date();
+          lockUntil.setMinutes(lockUntil.getMinutes() + 30);
+          user.lockedUntil = lockUntil;
         }
-        await userRepository.save(user);
-        await logAudit(AuditAction.LOGIN_FAILED, AuditStatus.FAILURE, 'Invalid password');
-        throw new Error('Invalid credentials');
+        
+        if (this.userRepository.update) {
+          await this.userRepository.update(user);
+        }
+        
+        return new FailureResult(new Error('Invalid credentials'));
       }
-      
+
+      // Check MFA
       if (user.mfaEnabled) {
-        await logAudit(AuditAction.LOGIN, AuditStatus.WARNING, 'MFA required');
-        return {
-          user: { id: user.id, email: user.email, roles: user.roles?.map(r => r.slug) || [], mfaEnabled: true },
-          tokens: { accessToken: '', refreshToken: '', expiresIn: 0, tokenType: 'Bearer' },
-          mfaRequired: true,
-        };
+        return new SuccessResult({
+          accessToken: '',
+          refreshToken: '',
+          expiresIn: 0,
+          requiresMfa: true,
+        });
       }
-      
+
+      // Reset failed attempts
       user.failedAttempts = 0;
       user.lockedUntil = null;
       user.lastLoginAt = new Date();
-      await userRepository.save(user);
       
-      const tokenFamilyId = uuidv4();
-      const tokens = await this.jwtService.generateTokens({
-        userId: user.id,
+      if (this.userRepository.update) {
+        await this.userRepository.update(user);
+      }
+
+      // Generate tokens
+      const tokens = await this.jwtService.generateTokenPair({
+        sub: user.id,
         email: user.email,
         roles: user.roles?.map(r => r.slug) || [],
       });
+
+      // Save refresh token
+      const refreshToken = new RefreshToken();
+      refreshToken.id = uuidv4();
+      refreshToken.userId = user.id;
+      refreshToken.tokenHash = await argon2.hash(tokens.refreshToken);
+      refreshToken.familyId = uuidv4();
+      refreshToken.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      refreshToken.ipAddress = input.ipAddress || null;
+      refreshToken.userAgent = input.userAgent || null;
+      refreshToken.isRevoked = false;
       
-      const refreshToken = tokenRepository.create({
-        id: uuidv4(),
-        userId: user.id,
-        tokenHash: await argon2.hash(tokens.refreshToken),
-        familyId: tokenFamilyId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        ipAddress: request.ipAddress || null,
-        userAgent: request.userAgent || null,
+      await this.tokenRepository.save(refreshToken);
+
+      return new SuccessResult({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
       });
-      await tokenRepository.save(refreshToken);
-      
-      await logAudit(AuditAction.LOGIN, AuditStatus.SUCCESS);
-      
-      return {
-        user: { id: user.id, email: user.email, roles: user.roles?.map(r => r.slug) || [], mfaEnabled: false },
-        tokens: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn, tokenType: tokens.tokenType },
-      };
-    } catch (error) {
-      logger.error('Login error', { error, email: request.email });
-      throw error;
+    } catch (error: any) {
+      return new FailureResult(new Error(error.message || 'Login failed'));
     }
   }
 }

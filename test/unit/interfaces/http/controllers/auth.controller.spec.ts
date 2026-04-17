@@ -400,7 +400,7 @@ describe('AuthController', () => {
 
   describe('setupMfa', () => {
     it('should setup MFA for authenticated user', async () => {
-      mockReq.user = { id: 'user-123' };
+      mockReq.user = { id: 'user-123', email: 'test@example.com', roles: ['user'] };
 
       await authController.setupMfa(mockReq as Request, mockRes as Response);
 

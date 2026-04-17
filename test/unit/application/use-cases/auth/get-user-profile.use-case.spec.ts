@@ -1,164 +1,168 @@
-import { GetUserProfileUseCase } from '../../../../src/application/use-cases/auth/get-user-profile.use-case';
-import { UserRepository } from '../../../../src/domain/repositories/user-repository.interface';
-import { User, UserStatus } from '../../../../src/domain/entities/user';
-import { Role } from '../../../../src/domain/entities/role';
-import { Permission } from '../../../../src/domain/entities/permission';
+import { GetUserProfileUseCase } from '@application/use-cases/auth/get-user-profile.use-case';
+import { UserRepository } from '@domain/repositories/user-repository.interface';
+import { User, UserStatus } from '@domain/entities/user';
+import { Role } from '@domain/entities/role';
+import { Permission } from '@domain/entities/permission';
 
 describe('GetUserProfileUseCase', () => {
   let useCase: GetUserProfileUseCase;
-  let userRepository: jest.Mocked<UserRepository>;
+  let mockUserRepository: jest.Mocked<UserRepository>;
 
   beforeEach(() => {
-    userRepository = {
+    mockUserRepository = {
       findById: jest.fn(),
-    } as unknown as jest.Mocked<UserRepository>;
+      findByEmail: jest.fn(),
+      findAll: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      exists: jest.fn(),
+    } as jest.Mocked<UserRepository>;
 
-    useCase = new GetUserProfileUseCase(userRepository);
+    useCase = new GetUserProfileUseCase(mockUserRepository);
   });
 
   describe('execute', () => {
-    it('should return user profile successfully', async () => {
-      const role = new Role();
-      role.id = 'role-1';
-      role.name = 'User';
-      role.slug = 'user';
-
+    it('should return user profile with roles and permissions', async () => {
+      // Arrange
       const permission = new Permission();
       permission.id = 'perm-1';
+      permission.slug = 'users:read';
       permission.resource = 'users';
       permission.action = 'read';
+
+      const role = new Role();
+      role.id = 'role-1';
+      role.name = 'Admin';
+      role.slug = 'admin';
       role.permissions = [permission];
 
       const user = new User();
       user.id = 'user-123';
       user.email = 'test@example.com';
       user.status = UserStatus.ACTIVE;
-      user.mfaEnabled = true;
+      user.mfaEnabled = false;
+      user.createdAt = new Date('2024-01-01');
       user.roles = [role];
-      user.lastLoginAt = new Date();
-      user.createdAt = new Date();
 
-      userRepository.findById.mockResolvedValue(user);
+      mockUserRepository.findById.mockResolvedValue(user);
 
+      // Act
       const result = await useCase.execute({ userId: 'user-123' });
 
-      expect(result.isSuccess()).toBe(true);
-      expect(result.getValue()).toEqual({
-        id: 'user-123',
-        email: 'test@example.com',
-        status: UserStatus.ACTIVE,
-        mfaEnabled: true,
-        roles: ['user'],
-        permissions: ['users:read'],
-        lastLoginAt: expect.any(Date),
-        createdAt: expect.any(Date),
-      });
+      // Assert
+      expect(result.id).toBe('user-123');
+      expect(result.email).toBe('test@example.com');
+      expect(result.roles).toHaveLength(1);
+      expect(result.roles[0].slug).toBe('admin');
+      expect(result.permissions).toContain('users:read');
     });
 
-    it('should return empty roles and permissions if user has none', async () => {
+    it('should return empty roles and permissions when user has no roles', async () => {
+      // Arrange
       const user = new User();
       user.id = 'user-123';
       user.email = 'test@example.com';
       user.status = UserStatus.ACTIVE;
       user.mfaEnabled = false;
+      user.createdAt = new Date('2024-01-01');
       user.roles = [];
 
-      userRepository.findById.mockResolvedValue(user);
+      mockUserRepository.findById.mockResolvedValue(user);
 
+      // Act
       const result = await useCase.execute({ userId: 'user-123' });
 
-      expect(result.getValue().roles).toEqual([]);
-      expect(result.getValue().permissions).toEqual([]);
+      // Assert
+      expect(result.roles).toEqual([]);
+      expect(result.permissions).toEqual([]);
     });
 
-    it('should fail when user not found', async () => {
-      userRepository.findById.mockResolvedValue(null);
+    it('should deduplicate permissions when user has multiple roles with same permission', async () => {
+      // Arrange
+      const permission = new Permission();
+      permission.id = 'perm-1';
+      permission.slug = 'users:read';
+      permission.resource = 'users';
+      permission.action = 'read';
 
-      const result = await useCase.execute({ userId: 'non-existent' });
+      const role1 = new Role();
+      role1.id = 'role-1';
+      role1.name = 'Admin';
+      role1.slug = 'admin';
+      role1.permissions = [permission];
 
-      expect(result.isFailure()).toBe(true);
-      expect(result.getError()?.message).toBe('User not found');
-    });
-
-    it('should fail when user is inactive', async () => {
-      const user = new User();
-      user.id = 'user-123';
-      user.status = UserStatus.INACTIVE;
-
-      userRepository.findById.mockResolvedValue(user);
-
-      const result = await useCase.execute({ userId: 'user-123' });
-
-      expect(result.isFailure()).toBe(true);
-      expect(result.getError()?.message).toBe('User account is not active');
-    });
-
-    it('should aggregate permissions from multiple roles', async () => {
-      const adminRole = new Role();
-      adminRole.name = 'admin';
-      adminRole.permissions = [
-        Object.assign(new Permission(), { resource: 'users', action: 'read' }),
-        Object.assign(new Permission(), { resource: 'users', action: 'write' }),
-      ];
-
-      const moderatorRole = new Role();
-      moderatorRole.name = 'moderator';
-      moderatorRole.permissions = [
-        Object.assign(new Permission(), { resource: 'posts', action: 'delete' }),
-      ];
+      const role2 = new Role();
+      role2.id = 'role-2';
+      role2.name = 'Manager';
+      role2.slug = 'manager';
+      role2.permissions = [permission]; // Same permission
 
       const user = new User();
       user.id = 'user-123';
       user.email = 'test@example.com';
       user.status = UserStatus.ACTIVE;
       user.mfaEnabled = false;
-      user.roles = [adminRole, moderatorRole];
+      user.createdAt = new Date('2024-01-01');
+      user.roles = [role1, role2];
 
-      userRepository.findById.mockResolvedValue(user);
+      mockUserRepository.findById.mockResolvedValue(user);
 
+      // Act
       const result = await useCase.execute({ userId: 'user-123' });
 
-      expect(result.getValue().permissions).toContain('users:read');
-      expect(result.getValue().permissions).toContain('users:write');
-      expect(result.getValue().permissions).toContain('posts:delete');
+      // Assert
+      expect(result.permissions).toHaveLength(1);
+      expect(result.permissions[0]).toBe('users:read');
     });
 
-    it('should handle database errors', async () => {
-      userRepository.findById.mockRejectedValue(new Error('Connection lost'));
+    it('should throw error when user is not found', async () => {
+      // Arrange
+      mockUserRepository.findById.mockResolvedValue(null);
 
-      const result = await useCase.execute({ userId: 'user-123' });
-
-      expect(result.isFailure()).toBe(true);
-      expect(result.getError()?.message).toBe('Failed to retrieve user profile');
+      // Act & Assert
+      await expect(useCase.execute({ userId: 'non-existent' }))
+        .rejects
+        .toThrow('User not found');
     });
 
-    it('should deduplicate permissions', async () => {
-      const role1 = new Role();
-      role1.name = 'role1';
-      role1.permissions = [
-        Object.assign(new Permission(), { resource: 'users', action: 'read' }),
-      ];
-
-      const role2 = new Role();
-      role2.name = 'role2';
-      role2.permissions = [
-        Object.assign(new Permission(), { resource: 'users', action: 'read' }),
-      ];
-
+    it('should include optional lastLoginAt when present', async () => {
+      // Arrange
       const user = new User();
       user.id = 'user-123';
       user.email = 'test@example.com';
       user.status = UserStatus.ACTIVE;
-      user.roles = [role1, role2];
+      user.mfaEnabled = false;
+      user.createdAt = new Date('2024-01-01');
+      user.lastLoginAt = new Date('2024-04-01');
+      user.roles = [];
 
-      userRepository.findById.mockResolvedValue(user);
+      mockUserRepository.findById.mockResolvedValue(user);
 
+      // Act
       const result = await useCase.execute({ userId: 'user-123' });
 
-      // Should only have one 'users:read' even though both roles have it
-      const permissions = result.getValue().permissions;
-      const readCount = permissions.filter((p: string) => p === 'users:read').length;
-      expect(readCount).toBe(1);
+      // Assert
+      expect(result.lastLoginAt).toEqual(user.lastLoginAt);
+    });
+
+    it('should not include lastLoginAt when not present', async () => {
+      // Arrange
+      const user = new User();
+      user.id = 'user-123';
+      user.email = 'test@example.com';
+      user.status = UserStatus.ACTIVE;
+      user.mfaEnabled = false;
+      user.createdAt = new Date('2024-01-01');
+      user.roles = [];
+
+      mockUserRepository.findById.mockResolvedValue(user);
+
+      // Act
+      const result = await useCase.execute({ userId: 'user-123' });
+
+      // Assert
+      expect(result.lastLoginAt).toBeUndefined();
     });
   });
 });

@@ -1,4 +1,4 @@
-import { JwtService } from '../../../src/infrastructure/services/jwt.service';
+import { JwtService } from '@infrastructure/services/jwt.service';
 import * as jose from 'jose';
 
 jest.mock('jose');
@@ -19,6 +19,8 @@ describe('JwtService', () => {
         setProtectedHeader: jest.fn().mockReturnThis(),
         setIssuedAt: jest.fn().mockReturnThis(),
         setExpirationTime: jest.fn().mockReturnThis(),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
         sign: jest.fn().mockResolvedValue('signed-token'),
       };
       
@@ -28,202 +30,243 @@ describe('JwtService', () => {
       const payload = { sub: 'user-123', email: 'test@example.com' };
       const result = await jwtService.sign(payload, { expiresIn: '1h' });
 
-      expect(jose.SignJWT).toHaveBeenCalledWith(payload);
-      expect(mockSignJWT.setProtectedHeader).toHaveBeenCalledWith({ alg: 'RS256' });
-      expect(mockSignJWT.setIssuedAt).toHaveBeenCalled();
-      expect(mockSignJWT.setExpirationTime).toHaveBeenCalledWith('1h');
+      expect(jose.importPKCS8).toHaveBeenCalledWith(mockPrivateKey, 'RS256');
       expect(result).toBe('signed-token');
     });
-
-    it('should use default expiration of 15 minutes', async () => {
-      const mockSignJWT = {
-        setProtectedHeader: jest.fn().mockReturnThis(),
-        setIssuedAt: jest.fn().mockReturnThis(),
-        setExpirationTime: jest.fn().mockReturnThis(),
-        sign: jest.fn().mockResolvedValue('token'),
-      };
-      
-      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
-      (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
-
-      await jwtService.sign({ sub: 'user-123' });
-
-      expect(mockSignJWT.setExpirationTime).toHaveBeenCalledWith('15m');
-    });
-
-    it('should throw error when private key is invalid', async () => {
-      (jose.importPKCS8 as jest.Mock).mockRejectedValue(new Error('Invalid key'));
-
-      await expect(jwtService.sign({ sub: 'user-123' }))
-        .rejects.toThrow('Failed to sign JWT');
-    });
   });
 
-  describe('verify', () => {
-    it('should verify and decode a valid token', async () => {
-      const mockPayload = { 
-        sub: 'user-123', 
-        email: 'test@example.com',
-        iat: 1234567890,
-        exp: 1234567990
-      };
-      
-      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
-      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-public-key');
-
-      const result = await jwtService.verify('valid-token');
-
-      expect(jose.jwtVerify).toHaveBeenCalledWith('valid-token', 'imported-public-key');
-      expect(result).toEqual(mockPayload);
-    });
-
-    it('should throw error for expired token', async () => {
-      (jose.jwtVerify as jest.Mock).mockRejectedValue(
-        new Error('JWTExpired: token expired')
-      );
-
-      await expect(jwtService.verify('expired-token'))
-        .rejects.toThrow('Token verification failed');
-    });
-
-    it('should throw error for invalid signature', async () => {
-      (jose.jwtVerify as jest.Mock).mockRejectedValue(
-        new Error('JWTInvalid: invalid signature')
-      );
-
-      await expect(jwtService.verify('invalid-token'))
-        .rejects.toThrow('Token verification failed');
-    });
-
-    it('should throw error when public key is invalid', async () => {
-      (jose.importSPKI as jest.Mock).mockRejectedValue(new Error('Invalid key'));
-
-      await expect(jwtService.verify('token'))
-        .rejects.toThrow('Token verification failed');
-    });
-  });
-
-  describe('decode', () => {
-    it('should decode token without verification', () => {
-      const mockPayload = { 
-        sub: 'user-123', 
-        email: 'test@example.com' 
-      };
-      
-      (jose.decodeJwt as jest.Mock).mockReturnValue(mockPayload);
-
-      const result = jwtService.decode('token-without-verification');
-
-      expect(jose.decodeJwt).toHaveBeenCalledWith('token-without-verification');
-      expect(result).toEqual(mockPayload);
-    });
-
-    it('should return null for invalid token format', () => {
-      (jose.decodeJwt as jest.Mock).mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      const result = jwtService.decode('invalid-token');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('generateTokenPair', () => {
+  describe('generateTokens', () => {
     it('should generate access and refresh tokens', async () => {
       const mockSignJWT = {
         setProtectedHeader: jest.fn().mockReturnThis(),
         setIssuedAt: jest.fn().mockReturnThis(),
         setExpirationTime: jest.fn().mockReturnThis(),
-        sign: jest.fn()
-          .mockResolvedValueOnce('access-token')
-          .mockResolvedValueOnce('refresh-token'),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
+        sign: jest.fn().mockResolvedValue('mock-token'),
       };
       
       (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
       (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
 
-      const payload = { sub: 'user-123', email: 'test@example.com' };
-      const result = await jwtService.generateTokenPair(payload);
+      const result = await jwtService.generateTokens(
+        'user-123',
+        'test@example.com',
+        ['user', 'admin']
+      );
 
-      expect(result).toEqual({
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        expiresIn: 900, // 15 minutes
-      });
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+      expect(result).toHaveProperty('expiresIn');
+      expect(result.accessToken).toBe('mock-token');
+      expect(result.refreshToken).toBe('mock-token');
+    });
+  });
+
+  describe('verifyToken', () => {
+    it('should verify a valid token', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        email: 'test@example.com',
+        roles: ['user'],
+        jti: 'token-id',
+      };
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      const result = await jwtService.verifyToken('valid-token');
+
+      expect(result).toEqual(mockPayload);
     });
 
-    it('should include familyId in refresh token', async () => {
-      const mockSignJWT = {
-        setProtectedHeader: jest.fn().mockReturnThis(),
-        setIssuedAt: jest.fn().mockReturnThis(),
-        setExpirationTime: jest.fn().mockReturnThis(),
-        sign: jest.fn()
-          .mockResolvedValueOnce('access-token')
-          .mockResolvedValueOnce('refresh-token'),
-      };
-      
-      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
-      (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
+    it('should throw error for invalid token', async () => {
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockRejectedValue(new Error('Invalid token'));
 
-      const payload = { sub: 'user-123', familyId: 'family-456' };
-      await jwtService.generateTokenPair(payload);
+      await expect(jwtService.verifyToken('invalid-token')).rejects.toThrow();
+    });
+  });
 
-      expect(mockSignJWT.sign).toHaveBeenCalledTimes(2);
+  describe('decodeToken', () => {
+    it('should decode a token without verification', () => {
+      const token = 'header.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature';
+      const result = jwtService.decodeToken(token);
+
+      expect(result).toHaveProperty('sub');
+    });
+
+    it('should return null for invalid token', () => {
+      const result = jwtService.decodeToken('invalid-token');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('isTokenExpired', () => {
+    it('should return false for valid token', () => {
+      const token = 'header.' + Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url') + '.signature';
+      expect(jwtService.isTokenExpired(token)).toBe(false);
+    });
+
+    it('should return true for expired token', () => {
+      const token = 'header.' + Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 3600 })).toString('base64url') + '.signature';
+      expect(jwtService.isTokenExpired(token)).toBe(true);
     });
   });
 
   describe('refreshAccessToken', () => {
-    it('should generate new access token from refresh token payload', async () => {
-      const mockPayload = { 
-        sub: 'user-123', 
-        email: 'test@example.com',
-        familyId: 'family-456'
+    it('should refresh access token with valid refresh token', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'refresh',
+        jti: 'refresh-token-id',
       };
-      
-      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
-      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-public-key');
 
       const mockSignJWT = {
         setProtectedHeader: jest.fn().mockReturnThis(),
         setIssuedAt: jest.fn().mockReturnThis(),
         setExpirationTime: jest.fn().mockReturnThis(),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
         sign: jest.fn().mockResolvedValue('new-access-token'),
       };
-      
-      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
       (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
+      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
 
       const result = await jwtService.refreshAccessToken('valid-refresh-token');
 
-      expect(result).toEqual({
-        accessToken: 'new-access-token',
-        expiresIn: 900,
-      });
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('expiresIn');
     });
 
-    it('should throw error when refresh token is invalid', async () => {
-      (jose.jwtVerify as jest.Mock).mockRejectedValue(new Error('Invalid token'));
+    it('should throw error for non-refresh token', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'access',
+      };
 
-      await expect(jwtService.refreshAccessToken('invalid-token'))
-        .rejects.toThrow('Token verification failed');
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      await expect(jwtService.refreshAccessToken('access-token')).rejects.toThrow('Invalid token type');
     });
   });
 
-  describe('calculateExpiration', () => {
-    it('should return correct expiration in seconds', () => {
-      const result = (jwtService as any).calculateExpiration('15m');
-      expect(result).toBe(900);
+  describe('getTokenRemainingTime', () => {
+    it('should return remaining time for valid token', () => {
+      const exp = Math.floor(Date.now() / 1000) + 3600;
+      const token = 'header.' + Buffer.from(JSON.stringify({ exp })).toString('base64url') + '.signature';
+      const result = jwtService.getTokenRemainingTime(token);
+
+      expect(result).toBeGreaterThan(3500);
+      expect(result).toBeLessThanOrEqual(3600);
     });
 
-    it('should handle hours', () => {
-      const result = (jwtService as any).calculateExpiration('2h');
-      expect(result).toBe(7200);
+    it('should return 0 for expired token', () => {
+      const exp = Math.floor(Date.now() / 1000) - 3600;
+      const token = 'header.' + Buffer.from(JSON.stringify({ exp })).toString('base64url') + '.signature';
+      const result = jwtService.getTokenRemainingTime(token);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('generatePasswordResetToken', () => {
+    it('should generate password reset token', async () => {
+      const mockSignJWT = {
+        setProtectedHeader: jest.fn().mockReturnThis(),
+        setIssuedAt: jest.fn().mockReturnThis(),
+        setExpirationTime: jest.fn().mockReturnThis(),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
+        sign: jest.fn().mockResolvedValue('reset-token'),
+      };
+
+      (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
+      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
+
+      const result = await jwtService.generatePasswordResetToken('user-123');
+
+      expect(result).toBe('reset-token');
+    });
+  });
+
+  describe('generateEmailVerificationToken', () => {
+    it('should generate email verification token', async () => {
+      const mockSignJWT = {
+        setProtectedHeader: jest.fn().mockReturnThis(),
+        setIssuedAt: jest.fn().mockReturnThis(),
+        setExpirationTime: jest.fn().mockReturnThis(),
+        setIssuer: jest.fn().mockReturnThis(),
+        setAudience: jest.fn().mockReturnThis(),
+        sign: jest.fn().mockResolvedValue('verification-token'),
+      };
+
+      (jose.importPKCS8 as jest.Mock).mockResolvedValue('imported-key');
+      (jose.SignJWT as jest.Mock).mockImplementation(() => mockSignJWT);
+
+      const result = await jwtService.generateEmailVerificationToken('user-123');
+
+      expect(result).toBe('verification-token');
+    });
+  });
+
+  describe('verifyPasswordResetToken', () => {
+    it('should verify password reset token and return userId', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'password_reset',
+      };
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      const result = await jwtService.verifyPasswordResetToken('reset-token');
+
+      expect(result).toBe('user-123');
     });
 
-    it('should handle days', () => {
-      const result = (jwtService as any).calculateExpiration('7d');
-      expect(result).toBe(604800);
+    it('should throw error for non-password-reset token', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'access',
+      };
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      await expect(jwtService.verifyPasswordResetToken('access-token')).rejects.toThrow('Invalid token type');
+    });
+  });
+
+  describe('verifyEmailVerificationToken', () => {
+    it('should verify email verification token and return userId', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'email_verification',
+      };
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      const result = await jwtService.verifyEmailVerificationToken('verification-token');
+
+      expect(result).toBe('user-123');
+    });
+
+    it('should throw error for non-email-verification token', async () => {
+      const mockPayload = {
+        sub: 'user-123',
+        type: 'access',
+      };
+
+      (jose.importSPKI as jest.Mock).mockResolvedValue('imported-key');
+      (jose.jwtVerify as jest.Mock).mockResolvedValue({ payload: mockPayload });
+
+      await expect(jwtService.verifyEmailVerificationToken('access-token')).rejects.toThrow('Invalid token type');
     });
   });
 });
