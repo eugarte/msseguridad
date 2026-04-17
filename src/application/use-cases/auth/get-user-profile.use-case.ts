@@ -1,5 +1,4 @@
 import { UserRepository } from '@domain/repositories/user-repository.interface';
-import { User } from '@domain/entities/user';
 import { Permission } from '@domain/entities/permission';
 import { Role } from '@domain/entities/role';
 

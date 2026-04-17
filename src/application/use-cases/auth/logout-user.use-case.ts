@@ -3,7 +3,7 @@ import { AppDataSource } from '@infrastructure/config/database';
 import { RefreshToken, TokenStatus } from '@domain/entities/refresh-token';
 import { AuditLog, AuditAction, AuditStatus } from '@domain/entities/audit-log';
 import { cacheClient } from '@infrastructure/config/cache';
-import argon2 from 'argon2';
+import bcrypt from 'bcrypt';
 import { logger } from '@infrastructure/services/logger';
 
 export class LogoutUserUseCase {
@@ -44,7 +44,7 @@ export class LogoutUserUseCase {
         });
         
         for (const token of tokens) {
-          if (await argon2.verify(token.tokenHash, request.refreshToken)) {
+          if (await bcrypt.compare(request.refreshToken, token.tokenHash)) {
             token.isRevoked = true;
             token.status = TokenStatus.REVOKED;
             token.revokedReason = 'User logout';

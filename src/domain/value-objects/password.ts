@@ -1,9 +1,11 @@
-import argon2 from 'argon2';
+import bcrypt from 'bcrypt';
 
 const COMMON_PASSWORDS = [
   'password', '123456', 'qwerty', 'abc123', 'password123',
   'admin', 'letmein', 'welcome', 'monkey', 'dragon'
 ];
+
+const SALT_ROUNDS = 12;
 
 export class Password {
   private readonly value: string;
@@ -62,18 +64,13 @@ export class Password {
   }
 
   /**
-   * Hash the password using Argon2id
+   * Hash the password using bcrypt
    */
   async hash(): Promise<string> {
     if (this.hashed) {
       return this.value;
     }
-    return await argon2.hash(this.value, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
+    return await bcrypt.hash(this.value, SALT_ROUNDS);
   }
 
   /**
@@ -81,7 +78,7 @@ export class Password {
    */
   static async verify(password: string, hash: string): Promise<boolean> {
     try {
-      return await argon2.verify(hash, password);
+      return await bcrypt.compare(password, hash);
     } catch {
       return false;
     }

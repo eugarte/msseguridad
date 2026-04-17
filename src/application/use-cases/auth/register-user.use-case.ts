@@ -2,7 +2,7 @@ import { User, UserStatus } from '../../../domain/entities/user';
 import { UserRepository } from '../../../domain/repositories/user-repository.interface';
 import { Email } from '../../../domain/value-objects/email';
 import { Password } from '../../../domain/value-objects/password';
-import * as argon2 from 'argon2';
+import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Result<T> {
@@ -73,10 +73,8 @@ export class RegisterUserUseCase {
         return new FailureResult(new Error('Email already registered'));
       }
 
-      // Hash password
-      const passwordHash = await argon2.hash(input.password, {
-        type: argon2.argon2id,
-      });
+      // Hash password using bcrypt
+      const passwordHash = await bcrypt.hash(input.password, 12);
 
       // Create user
       const user = new User();

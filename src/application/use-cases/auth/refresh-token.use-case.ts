@@ -4,7 +4,7 @@ import { RefreshToken, TokenStatus } from '@domain/entities/refresh-token';
 import { AuditLog, AuditAction, AuditStatus } from '@domain/entities/audit-log';
 import { JwtService } from '@infrastructure/services/jwt.service';
 import { User } from '@domain/entities/user';
-import argon2 from 'argon2';
+import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '@infrastructure/services/logger';
 
@@ -24,7 +24,7 @@ export class RefreshTokenUseCase {
       
       let matchedToken: RefreshToken | null = null;
       for (const token of tokens) {
-        if (await argon2.verify(token.tokenHash, request.refreshToken)) {
+        if (await bcrypt.compare(request.refreshToken, token.tokenHash)) {
           matchedToken = token;
           break;
         }
@@ -77,7 +77,7 @@ export class RefreshTokenUseCase {
       const newRefreshToken = tokenRepository.create({
         id: uuidv4(),
         userId: user.id,
-        tokenHash: await argon2.hash(newTokens.refreshToken),
+        tokenHash: await bcrypt.hash(newTokens.refreshToken, 12),
         familyId: matchedToken.familyId,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });

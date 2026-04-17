@@ -2,7 +2,7 @@ import { User, UserStatus } from '../../../domain/entities/user';
 import { RefreshToken } from '../../../domain/entities/refresh-token';
 import { UserRepository } from '../../../domain/repositories/user-repository.interface';
 import { JwtService } from '../../../infrastructure/services/jwt.service';
-import * as argon2 from 'argon2';
+import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Result<T> {
@@ -74,9 +74,8 @@ export class LoginUserUseCase {
         return new FailureResult(new Error('Account is not active'));
       }
 
-      // Verify password (in a real scenario, we'd compare hashes)
-      // For testing, we assume the hash is valid argon2 format
-      const isValidPassword = await argon2.verify(user.passwordHash, input.password).catch(() => false);
+      // Verify password using bcrypt
+      const isValidPassword = await bcrypt.compare(input.password, user.passwordHash).catch(() => false);
       
       if (!isValidPassword) {
         user.failedAttempts = (user.failedAttempts || 0) + 1;
@@ -125,7 +124,7 @@ export class LoginUserUseCase {
       const refreshToken = new RefreshToken();
       refreshToken.id = uuidv4();
       refreshToken.userId = user.id;
-      refreshToken.tokenHash = await argon2.hash(tokens.refreshToken);
+      refreshToken.tokenHash = await bcrypt.hash(tokens.refreshToken, 12);
       refreshToken.familyId = uuidv4();
       refreshToken.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       refreshToken.ipAddress = input.ipAddress || null;

@@ -27,10 +27,12 @@
     "db:migrate:revert": "typeorm-ts-node-commonjs migration:revert -d src/infrastructure/config/database.ts",
     "db:generate": "typeorm-ts-node-commonjs migration:generate -d src/infrastructure/config/database.ts",
     "db:seed": "tsx src/infrastructure/database/run-seed.ts",
-    "sonar:scan": "sonar-scanner"
+    "sonar:scan": "sonar-scanner",
+    "hostinger:build": "npm ci && npm run build && npm prune --production",
+    "hostinger:start": "NODE_ENV=production node dist/main.js"
   },
   "dependencies": {
-    "argon2": "^0.40.1",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "compression": "^1.7.4",
@@ -60,6 +62,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.2.1",
     "@commitlint/config-conventional": "^19.1.0",
+    "@types/bcrypt": "^5.0.2",
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
