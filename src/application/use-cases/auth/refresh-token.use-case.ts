@@ -66,7 +66,7 @@ export class RefreshTokenUseCase {
       
       matchedToken.status = TokenStatus.USED;
       matchedToken.usedAt = new Date();
-      await tokenRepository.save(matchedToken);
+      await tokenRepository.save(matchedToken as any);
       
       const newTokens = await this.jwtService.generateTokens(
         user.id,
@@ -81,7 +81,7 @@ export class RefreshTokenUseCase {
         familyId: matchedToken.familyId,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
-      await tokenRepository.save(newRefreshToken);
+      await tokenRepository.save(newRefreshToken as any);
       
       await auditLogRepository.save({
         userId: user.id,
