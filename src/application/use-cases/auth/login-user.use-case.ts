@@ -1,4 +1,3 @@
-import type { User } from '../../../domain/entities/user';
 import { UserStatus } from '../../../domain/enums/UserStatus';
 import { RefreshToken } from '../../../domain/entities/refresh-token';
 import { UserRepository } from '../../../domain/repositories/user-repository.interface';
@@ -115,11 +114,11 @@ export class LoginUserUseCase {
       }
 
       // Generate tokens
-      const tokens = await this.jwtService.generateTokenPair({
-        sub: user.id,
-        email: user.email,
-        roles: user.roles?.map(r => r.slug) || [],
-      });
+      const tokens = await this.jwtService.generateTokens(
+        user.id,
+        user.email,
+        user.roles?.map(r => r.slug) || []
+      );
 
       // Save refresh token
       const refreshToken = new RefreshToken();

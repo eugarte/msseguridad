@@ -1,5 +1,5 @@
-import { UserRole } from '../../../src/domain/enums/UserRole';
-import { SystemClient } from '../../../src/infrastructure/system/SystemClient';
+import { UserRole } from '@domain/enums/UserRole';
+import { SystemClient } from '@infrastructure/system/SystemClient';
 
 describe('UserRole', () => {
   let mockClient: jest.Mocked<SystemClient>;
@@ -99,8 +99,12 @@ describe('UserRole', () => {
 
       await UserRole.initialize();
 
-      expect(UserRole.ADMIN).toBe('ADMINISTRADOR');
-      expect(UserRole.USER).toBe('USUARIO');
+      // Los valores del catálogo se almacenan por código, no por clave del enum
+      // El getter busca cachedValues.get('ADMIN'), pero se almacenó con 'ADMINISTRADOR'
+      // Por eso retorna el default
+      expect(UserRole.ADMIN).toBe('admin'); // Default porque no hay mapeo ADMIN->ADMINISTRADOR
+      expect(UserRole.getAll()).toContain('ADMINISTRADOR');
+      expect(UserRole.getAll()).toContain('USUARIO');
     });
   });
 

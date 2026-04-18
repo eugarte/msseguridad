@@ -1,4 +1,4 @@
-import { SystemClient, SystemClientConfig, Catalog, CatalogValue, Configuration, RegisteredService, HeartbeatResponse } from '../../../src/infrastructure/system/SystemClient';
+import { SystemClient, SystemClientConfig, Catalog, CatalogValue, Configuration, RegisteredService, HeartbeatResponse } from '@infrastructure/system/SystemClient';
 
 describe('SystemClient', () => {
   let client: SystemClient;

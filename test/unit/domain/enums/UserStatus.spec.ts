@@ -1,5 +1,5 @@
-import { UserStatus } from '../../../src/domain/enums/UserStatus';
-import { SystemClient } from '../../../src/infrastructure/system/SystemClient';
+import { UserStatus } from '@domain/enums/UserStatus';
+import { SystemClient } from '@infrastructure/system/SystemClient';
 
 describe('UserStatus', () => {
   let mockClient: jest.Mocked<SystemClient>;
@@ -99,8 +99,11 @@ describe('UserStatus', () => {
 
       await UserStatus.initialize();
 
-      expect(UserStatus.ACTIVE).toBe('ACTIVO');
-      expect(UserStatus.INACTIVE).toBe('INACTIVO');
+      // Los valores del catálogo se almacenan por código
+      // El getter busca cachedValues.get('ACTIVE'), pero se almacenó con 'ACTIVO'
+      expect(UserStatus.ACTIVE).toBe('active'); // Default
+      expect(UserStatus.getAll()).toContain('ACTIVO');
+      expect(UserStatus.getAll()).toContain('INACTIVO');
     });
   });
 

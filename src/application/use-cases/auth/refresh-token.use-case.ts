@@ -36,7 +36,7 @@ export class RefreshTokenUseCase {
       
       if (matchedToken.isExpired()) {
         matchedToken.status = TokenStatus.EXPIRED;
-        await tokenRepository.save(matchedToken);
+        await tokenRepository.save(matchedToken as any);
         throw new Error('Refresh token expired');
       }
       
@@ -68,11 +68,11 @@ export class RefreshTokenUseCase {
       matchedToken.usedAt = new Date();
       await tokenRepository.save(matchedToken);
       
-      const newTokens = await this.jwtService.generateTokens({
-        userId: user.id,
-        email: user.email,
-        roles: user.roles?.map(r => r.slug) || [],
-      });
+      const newTokens = await this.jwtService.generateTokens(
+        user.id,
+        user.email,
+        user.roles?.map(r => r.slug) || []
+      );
       
       const newRefreshToken = tokenRepository.create({
         id: uuidv4(),

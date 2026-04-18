@@ -43,7 +43,7 @@ export async function authMiddleware(
       id: payload.sub,
       email: payload.email || '',
       roles: payload.roles || [],
-      permissions: payload.permissions || [],
+      permissions: (payload as any).permissions || [],
     };
     
     next();

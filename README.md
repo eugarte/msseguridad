@@ -16,6 +16,7 @@ Microservicio de seguridad y autenticación robusto, escalable y compatible con 
 - [Stack Tecnológico](#-stack-tecnológico)
 - [Arquitectura](#-arquitectura)
 - [Instalación](#-instalación)
+- [Integración con mssistemas](#-integración-con-mssistemas)
 - [Desarrollo](#-desarrollo)
 - [Testing](#-testing)
 - [Calidad de Código](#-calidad-de-código)
@@ -184,6 +185,79 @@ npm run start:dev
 ```
 
 El servidor estará disponible en: http://localhost:3000
+
+---
+
+## 🔗 Integración con mssistemas
+
+msseguridad se integra con **mssistemas** para gestión centralizada de catálogos y configuración.
+
+### Variables de Entorno
+
+Agrega estas variables a tu archivo `.env`:
+
+```bash
+# mssistemas Integration
+MSSISTEMAS_URL=http://localhost:3001
+MSSISTEMAS_API_KEY=your-api-key-here
+SERVICE_NAME=msseguridad
+SERVICE_VERSION=1.0.0
+SERVICE_BASE_URL=http://localhost:3000
+HEARTBEAT_INTERVAL_MS=30000
+```
+
+### Funcionalidades
+
+| Funcionalidad | Descripción |
+|---------------|-------------|
+| **Catálogos Dinámicos** | `UserStatus` y `UserRole` obtienen valores de mssistemas con fallback local |
+| **Configuración Centralizada** | Obtén configuraciones por ambiente desde mssistemas |
+| **Auto-registro** | El servicio se registra automáticamente al iniciar |
+| **Heartbeat** | Envia señales de vida cada 30 segundos |
+
+### Uso de Catálogos
+
+```typescript
+import { UserStatus } from '@domain/enums/UserStatus';
+import { UserRole } from '@domain/enums/UserRole';
+
+// Los valores se cargan automáticamente de mssistemas
+// con fallback a valores por defecto si no está disponible
+const status = UserStatus.ACTIVE;  // 'active' o valor del catálogo
+const role = UserRole.ADMIN;       // 'admin' o valor del catálogo
+
+// Validar valores
+const isValid = await UserStatus.validate('active');
+const hasPermission = UserRole.hasPermission('admin', 'user');
+```
+
+### SystemClient
+
+```typescript
+import { SystemClient } from '@infrastructure/system/SystemClient';
+
+const client = new SystemClient({
+  baseUrl: process.env.MSSISTEMAS_URL!,
+  apiKey: process.env.MSSISTEMAS_API_KEY!,
+  serviceName: 'msseguridad',
+  serviceVersion: '1.0.0',
+});
+
+// Obtener valores de catálogo
+const values = await client.getCatalogValues('user_status');
+
+// Validar código en catálogo
+const isValid = await client.validateCatalogValue('user_status', 'active');
+
+// Obtener configuración
+const config = await client.getConfiguration('max_login_attempts', 'production');
+
+// Registrar servicio
+await client.registerService();
+
+// Iniciar heartbeat automático
+client.startHeartbeat(30000);
+```
 
 ---
 
