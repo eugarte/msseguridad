@@ -1,4 +1,5 @@
-import { User, UserStatus } from '../../../domain/entities/user';
+import type { User } from '../../../domain/entities/user';
+import { UserStatus } from '../../../domain/enums/UserStatus';
 import { RefreshToken } from '../../../domain/entities/refresh-token';
 import { UserRepository } from '../../../domain/repositories/user-repository.interface';
 import { JwtService } from '../../../infrastructure/services/jwt.service';

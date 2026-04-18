@@ -1,9 +1,17 @@
+/**
+ * Error Handler Middleware
+ */
 import { Request, Response, NextFunction } from 'express';
-import { DomainError } from '../../domain/errors/domain-error';
-import { logger } from '../services/logger';
+import { DomainError } from '@domain/errors/domain-error';
+import { logger } from '@infrastructure/services/logger';
+
+interface ErrorWithStatus extends Error {
+  statusCode?: number;
+  code?: string;
+}
 
 export function errorHandler(
-  err: Error,
+  err: ErrorWithStatus,
   _req: Request,
   res: Response,
   _next: NextFunction
@@ -11,7 +19,7 @@ export function errorHandler(
   logger.error('Error occurred', { error: err.message, stack: err.stack });
 
   if (err instanceof DomainError) {
-    res.status(err.statusCode).json({
+    res.status(err.statusCode || 500).json({
       error: err.message,
       code: err.code,
     });

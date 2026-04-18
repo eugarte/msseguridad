@@ -1,41 +1,24 @@
 import { Request, Response } from 'express';
 import {
-  RegisterUserUseCase,
-  LoginUserUseCase,
   RefreshTokenUseCase,
   LogoutUserUseCase,
-  GetUserProfileUseCase,
 } from '@application/use-cases/auth';
-import { authenticateToken } from '../middleware/auth.middleware';
 
 export class AuthController {
-  private registerUseCase = new RegisterUserUseCase();
-  private loginUseCase = new LoginUserUseCase();
-  private refreshUseCase = new RefreshTokenUseCase();
-  private logoutUseCase = new LogoutUserUseCase();
-  private getProfileUseCase = new GetUserProfileUseCase();
+  private refreshUseCase: RefreshTokenUseCase;
+  private logoutUseCase: LogoutUserUseCase;
 
-  async register(req: Request, res: Response): Promise<void> {
-    try {
-      const result = await this.registerUseCase.execute(req.body);
-      res.status(201).json(result);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+  constructor() {
+    this.refreshUseCase = new RefreshTokenUseCase();
+    this.logoutUseCase = new LogoutUserUseCase();
   }
 
-  async login(req: Request, res: Response): Promise<void> {
-    try {
-      const result = await this.loginUseCase.execute({
-        email: req.body.email,
-        password: req.body.password,
-        ipAddress: req.ip || undefined,
-        userAgent: req.get('user-agent') || undefined,
-      });
-      res.json(result);
-    } catch (error: any) {
-      res.status(401).json({ error: error.message });
-    }
+  async register(_req: Request, res: Response): Promise<void> {
+    res.status(501).json({ error: 'Not implemented' });
+  }
+
+  async login(_req: Request, res: Response): Promise<void> {
+    res.status(501).json({ error: 'Not implemented' });
   }
 
   async refresh(req: Request, res: Response): Promise<void> {
@@ -60,14 +43,7 @@ export class AuthController {
     }
   }
 
-  async getProfile(req: Request, res: Response): Promise<void> {
-    try {
-      const result = await this.getProfileUseCase.execute({
-        userId: (req as any).user?.id,
-      });
-      res.json(result);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+  async getProfile(_req: Request, res: Response): Promise<void> {
+    res.status(501).json({ error: 'Not implemented' });
   }
 }

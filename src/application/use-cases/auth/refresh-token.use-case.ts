@@ -94,7 +94,7 @@ export class RefreshTokenUseCase {
         accessToken: newTokens.accessToken,
         refreshToken: newTokens.refreshToken,
         expiresIn: newTokens.expiresIn,
-        tokenType: newTokens.tokenType,
+        tokenType: 'Bearer',
       };
     } catch (error) {
       logger.error('Token refresh error', { error });

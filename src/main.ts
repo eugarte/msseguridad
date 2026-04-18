@@ -13,10 +13,18 @@ import { requestLogger } from '@infrastructure/http/middleware/request-logger';
 import { metricsMiddleware } from '@infrastructure/http/middleware/metrics';
 import authRoutes from '@interfaces/http/routes/auth.routes';
 
+// mssistemas integration
+import { SystemClient } from '@infrastructure/system/SystemClient';
+import { UserStatus } from '@domain/enums/UserStatus';
+import { UserRole } from '@domain/enums/UserRole';
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// mssistemas client
+let systemClient: SystemClient | null = null;
 
 // Security middleware
 app.use(helmet({
@@ -72,7 +80,7 @@ app.use(requestLogger);
 app.use(metricsMiddleware);
 
 // Health checks
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
   try {
     if (AppDataSource.isInitialized) {
       await AppDataSource.query('SELECT 1');
@@ -85,6 +93,7 @@ app.get('/health', async (req, res) => {
       services: {
         database: AppDataSource.isInitialized ? 'connected' : 'not_initialized',
         cache: 'memory (lru-cache)',
+        mssistemas: systemClient?.getServiceId() ? 'connected' : 'not_connected',
       },
     });
   } catch (error) {
@@ -120,6 +129,58 @@ app.use((req, res) => {
 // Error handling
 app.use(errorHandler);
 
+// Initialize mssistemas integration
+async function initializeMssistemas(): Promise<void> {
+  try {
+    const mssistemasUrl = process.env.MSSISTEMAS_URL;
+    const mssistemasApiKey = process.env.MSSISTEMAS_API_KEY;
+    const serviceName = process.env.SERVICE_NAME || 'msseguridad';
+    const serviceVersion = process.env.SERVICE_VERSION || process.env.npm_package_version || '1.0.0';
+
+    if (!mssistemasUrl || !mssistemasApiKey) {
+      logger.warn('mssistemas integration disabled: MSSISTEMAS_URL or MSSISTEMAS_API_KEY not set');
+      return;
+    }
+
+    systemClient = new SystemClient({
+      baseUrl: mssistemasUrl,
+      apiKey: mssistemasApiKey,
+      serviceName,
+      serviceVersion,
+      environment: process.env.NODE_ENV || 'development',
+    });
+
+    // Set client for enums
+    UserStatus.setClient(systemClient);
+    UserRole.setClient(systemClient);
+
+    // Initialize enums with catalog values
+    await UserStatus.initialize();
+    await UserRole.initialize();
+
+    // Register service in mssistemas
+    await systemClient.registerService({
+      description: 'Microservicio de seguridad y autenticación',
+      baseUrl: process.env.SERVICE_BASE_URL || `http://localhost:${PORT}`,
+      healthCheckUrl: '/health',
+    });
+
+    // Start heartbeat
+    const heartbeatInterval = parseInt(process.env.HEARTBEAT_INTERVAL_MS || '30000');
+    systemClient.startHeartbeat(heartbeatInterval);
+
+    logger.info('mssistemas integration initialized', {
+      serviceId: systemClient.getServiceId(),
+      serviceName,
+      heartbeatInterval,
+    });
+  } catch (error) {
+    logger.error('Failed to initialize mssistemas integration', { error });
+    // Don't fail startup if mssistemas is unavailable
+    systemClient = null;
+  }
+}
+
 // Database connection and server start
 async function bootstrap() {
   try {
@@ -132,6 +193,9 @@ async function bootstrap() {
     }
 
     logger.info('Memory cache initialized (lru-cache)');
+
+    // Initialize mssistemas integration
+    await initializeMssistemas();
 
     // Start server
     app.listen(PORT, () => {
@@ -151,6 +215,11 @@ async function bootstrap() {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
+
+  // Stop heartbeat
+  if (systemClient) {
+    systemClient.stopHeartbeat();
+  }
   
   if (AppDataSource.isInitialized) {
     await AppDataSource.destroy();
@@ -162,6 +231,11 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+
+  // Stop heartbeat
+  if (systemClient) {
+    systemClient.stopHeartbeat();
+  }
   
   if (AppDataSource.isInitialized) {
     await AppDataSource.destroy();

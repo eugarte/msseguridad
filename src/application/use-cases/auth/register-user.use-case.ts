@@ -55,14 +55,14 @@ export class RegisterUserUseCase {
       // Validate email
       let email: Email;
       try {
-        email = new Email(input.email.trim());
+        email = Email.create(input.email.trim());
       } catch (error: any) {
         return new FailureResult(new Error(error.message || 'Invalid email format'));
       }
 
       // Validate password
       try {
-        new Password(input.password);
+        Password.create(input.password);
       } catch (error: any) {
         return new FailureResult(new Error(error.message || 'Password is too weak'));
       }

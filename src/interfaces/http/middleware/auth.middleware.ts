@@ -37,7 +37,7 @@ export async function authMiddleware(
   const token = parts[1];
 
   try {
-    const payload = await jwtService.verify(token);
+    const payload = await jwtService.verifyToken(token);
     
     req.user = {
       id: payload.sub,

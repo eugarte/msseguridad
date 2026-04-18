@@ -1,6 +1,5 @@
 import { User } from '../entities/user';
-import { Role } from '../entities/role';
-import { Permission } from '../entities/permission';
+import type { Permission } from '../entities/permission';
 
 export class PermissionEvaluator {
   /**
